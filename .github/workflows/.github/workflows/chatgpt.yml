@@ -1,0 +1,16 @@
+name: ChatGPT GitHub Action
+
+on:
+  issues:
+    types: [opened]
+
+jobs:
+  chatgpt:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: ChatGPT GitHub Actions
+        uses: dlidstrom/genai-code-review@v3.0.8
