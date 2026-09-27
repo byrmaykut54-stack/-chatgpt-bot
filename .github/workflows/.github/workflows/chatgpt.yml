@@ -1,6 +1,7 @@
 name: ChatGPT GitHub Action
 
 on:
+  workflow_dispatch:
   issues:
     types: [opened]
 
