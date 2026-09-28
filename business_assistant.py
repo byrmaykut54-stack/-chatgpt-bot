@@ -590,6 +590,9 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_header("Content-Length",str(len(body))); self.end_headers(); self.wfile.write(body); return
 
             if self.path == "/api/auth/login":
+                client_key=self.client_address[0] if self.client_address else "unknown"
+                if rate_limited("login:"+client_key,8,60):
+                    self.send_json(429,{"error":"Çok fazla giriş denemesi. Lütfen kısa süre sonra tekrar deneyin."}); return
                 email=str(data.get("email","")).strip().lower()
                 password=str(data.get("password",""))
                 if not email or not password:
@@ -619,20 +622,23 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_header("Content-Length",str(len(body))); self.end_headers(); self.wfile.write(body); return
 
             if self.path == "/webhook/whatsapp":
+                business_id = whatsapp_business_id(data)
+                if business_id is None:
+                    self.send_json(403,{"error":"WhatsApp işletme eşlemesi bulunamadı."}); return
                 incoming = parse_whatsapp_message(data)
                 if not incoming:
                     self.send_json(200, {"received": True, "processed": False}); return
-                if whatsapp_message_already_processed(incoming.get("message_id", "")):
+                if whatsapp_message_already_processed(incoming.get("message_id", ""), business_id):
                     self.send_json(200, {"received": True, "processed": False, "duplicate": True}); return
-                result = handle_customer_message(incoming["message"], "whatsapp", incoming["customer_name"], incoming["phone"])
+                result = handle_customer_message(incoming["message"], "whatsapp", incoming["customer_name"], incoming["phone"], {"1": business_id, "5": database.get_business_config(business_id)})
                 ok, send_result = send_whatsapp_text(incoming["phone"], result["reply"])
                 out = {"received": True, "processed": True, "result": result, "reply_sent": ok}
                 if not ok:
                     out["reply_error"] = send_result
                 else:
-                    messages = load_messages()
+                    messages = database.load_messages_by_business(business_id)
                     messages.append({"id": datetime.utcnow().strftime("%Y%m%d%H%M%S%f"), "message_id": incoming.get("message_id", ""), "channel": "whatsapp", "direction": "outbound", "customer_name": incoming["customer_name"], "phone": incoming["phone"], "message": result["reply"], "intent": "ai_reply", "created_at": datetime.utcnow().isoformat() + "Z"})
-                    save_messages(messages)
+                    database.save_messages_by_business(business_id, messages)
                 self.send_json(200, out); return
 
             if self.path in ("/chat", "/webhook/message"):
@@ -728,27 +734,3 @@ class Handler(BaseHTTPRequestHandler):
 
             if self.path == "/api/appointments/status":
                 user=auth_required(self)
-                if not user: return
-                if not user_can(user,"appointments"):
-                    self.send_json(403,{"error":"Randevu durumunu değiştirme yetkiniz yok."}); return
-                appointment_id = str(data.get("id", "")).strip()
-                status = str(data.get("status", "")).strip()
-                if status not in {"pending", "confirmed", "cancelled", "completed"}:
-                    self.send_json(400, {"error": "Geçersiz durum"}); return
-                items = load_appointments(user)
-                for item in items:
-                    if item["id"] == appointment_id:
-                        item["status"] = status
-                        save_appointments(items, user)
-                        self.send_json(200, {"success": True}); return
-                self.send_json(404, {"error": "Randevu bulunamadı"}); return
-
-            self.send_json(404, {"error": "Not found"})
-        except Exception as exc:
-            self.send_json(500, {"error": str(exc)})
-
-if __name__ == "__main__":
-    initialize_database()
-    port = int(os.environ.get("PORT", "8080"))
-    print(f"AI İşletme Asistanı: http://0.0.0.0:{port}")
-    HTTPServer(("0.0.0.0", port), Handler).serve_forever()
