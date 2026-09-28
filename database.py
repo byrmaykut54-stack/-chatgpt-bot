@@ -1,4 +1,5 @@
 import os
+from datetime import datetime, timezone
 from contextlib import contextmanager
 
 try:
@@ -13,6 +14,9 @@ CREATE TABLE IF NOT EXISTS businesses (
     id BIGSERIAL PRIMARY KEY,
     name TEXT NOT NULL,
     config JSONB NOT NULL DEFAULT '{}'::jsonb,
+    plan TEXT NOT NULL DEFAULT 'trial',
+    status TEXT NOT NULL DEFAULT 'active',
+    trial_ends_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -97,6 +101,9 @@ def ensure_schema():
         return
     with connection() as conn:
         conn.execute(SCHEMA)
+        conn.execute("ALTER TABLE businesses ADD COLUMN IF NOT EXISTS plan TEXT NOT NULL DEFAULT 'trial'")
+        conn.execute("ALTER TABLE businesses ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active'")
+        conn.execute("ALTER TABLE businesses ADD COLUMN IF NOT EXISTS trial_ends_at TIMESTAMPTZ")
         conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS permissions JSONB NOT NULL DEFAULT '{}'::jsonb")
         conn.execute("ALTER TABLE sessions ALTER COLUMN expires_at DROP NOT NULL")
         conn.execute("ALTER TABLE sessions ADD COLUMN IF NOT EXISTS revoked_at TIMESTAMPTZ")
@@ -105,7 +112,7 @@ def ensure_schema():
 def create_business(name, config):
     with connection() as conn:
         row = conn.execute(
-            "INSERT INTO businesses (name, config) VALUES (%s, %s) RETURNING id",
+            "INSERT INTO businesses (name, config, plan, status, trial_ends_at) VALUES (%s, %s, 'trial', 'active', NOW() + INTERVAL '14 days') RETURNING id",
             (name, psycopg.types.json.Json(config))
         ).fetchone()
         conn.commit()
@@ -366,3 +373,15 @@ def update_user_permissions(business_id,user_id,permissions):
         row=conn.execute("UPDATE users SET permissions=%s WHERE id=%s AND business_id=%s RETURNING id",(psycopg.types.json.Json(permissions),user_id,business_id)).fetchone()
         conn.commit()
         return bool(row)
+
+def get_business_subscription(business_id):
+    with connection() as conn:
+        row = conn.execute(
+            "SELECT plan,status,trial_ends_at FROM businesses WHERE id=%s",
+            (business_id,)
+        ).fetchone()
+    if not row:
+        return {"plan":"trial","status":"unknown","trial_ends_at":None,"trial_active":False}
+    trial_ends = row[2]
+    active = row[1] == "active" and (row[0] != "trial" or trial_ends is None or trial_ends > datetime.now(timezone.utc))
+    return {"plan":row[0],"status":row[1],"trial_ends_at":trial_ends.isoformat() if trial_ends else None,"trial_active":active}
