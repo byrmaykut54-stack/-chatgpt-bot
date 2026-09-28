@@ -545,6 +545,8 @@ class Handler(BaseHTTPRequestHandler):
             if self.path == "/api/business":
                 user=auth_required(self)
                 if not user: return
+                if not user_can(user,"business_settings"):
+                    self.send_json(403,{"error":"İşletme ayarlarını değiştirme yetkiniz yok."}); return
                 name=str(data.get("business_name","")).strip()
                 config=data.get("config") if isinstance(data.get("config"),dict) else data
                 if name: config["business_name"]=name
@@ -556,6 +558,8 @@ class Handler(BaseHTTPRequestHandler):
             if self.path == "/api/appointments":
                 user=auth_required(self)
                 if not user: return
+                if not user_can(user,"appointments"):
+                    self.send_json(403,{"error":"Randevu işlemi yapma yetkiniz yok."}); return
                 appointment, error = create_appointment(data, user)
                 if not appointment:
                     self.send_json(409 if error and "başka bir randevu" in error else 400, {"error": error or "Randevu oluşturulamadı"}); return
@@ -564,6 +568,8 @@ class Handler(BaseHTTPRequestHandler):
             if self.path == "/api/appointments/status":
                 user=auth_required(self)
                 if not user: return
+                if not user_can(user,"appointments"):
+                    self.send_json(403,{"error":"Randevu durumunu değiştirme yetkiniz yok."}); return
                 appointment_id = str(data.get("id", "")).strip()
                 status = str(data.get("status", "")).strip()
                 if status not in {"pending", "confirmed", "cancelled", "completed"}:
