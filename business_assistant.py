@@ -165,6 +165,22 @@ def iyzico_start_checkout(user):
     payload={"locale":"tr","callbackUrl":callback,"pricingPlanReferenceCode":plan_ref,"subscriptionInitialStatus":"ACTIVE","conversationId":"nexora-"+str(user[1])+"-"+str(int(datetime.now(timezone.utc).timestamp())),"customer":{"name":name[:50],"surname":"Owner","email":email,"gsmNumber":config.get("phone",""),"billingAddress":{"address":config.get("address","NEXORA"),"zipCode":"","contactName":name[:100],"city":"Türkiye","country":"Türkiye"}}}
     return iyzico_request("POST","/v2/subscription/checkoutform/initialize",payload)
 
+def verify_iyzico_subscription_webhook(data, signature):
+    secret=os.environ.get("IYZICO_SECRET_KEY","").strip()
+    merchant=str(data.get("merchantId","")).strip()
+    event=str(data.get("iyziEventType","")).strip()
+    sub=str(data.get("subscriptionReferenceCode","")).strip()
+    order=str(data.get("orderReferenceCode","")).strip()
+    customer=str(data.get("customerReferenceCode","")).strip()
+    if not secret or not merchant or not event or not sub or not order or not customer or not signature:
+        return False
+    key=merchant+secret+event+sub+order+customer
+    calculated=hmac.new(secret.encode("utf-8"),key.encode("utf-8"),hashlib.sha256).hexdigest()
+    return hmac.compare_digest(calculated,signature.strip())
+
+def iyzico_cancel_subscription(reference_code):
+    return iyzico_request("POST",f"/v2/subscription/subscriptions/{reference_code}/cancel",{"subscriptionReferenceCode":reference_code})
+
 def user_can(user, module):
     if not user or not database_enabled(): return False
     if user[3] == 'owner': return True
@@ -657,6 +673,18 @@ class Handler(BaseHTTPRequestHandler):
 
             data = json.loads(raw_body)
 
+            if self.path == "/webhook/iyzico/subscription":
+                signature=self.headers.get("X-IYZ-SIGNATURE-V3","")
+                if not verify_iyzico_subscription_webhook(data,signature):
+                    self.send_json(403,{"error":"iyzico webhook imzası doğrulanamadı."}); return
+                business_id=database.get_business_by_provider_subscription(str(data.get("subscriptionReferenceCode","")).strip())
+                if not business_id:
+                    self.send_json(404,{"error":"Abonelik eşleşmesi bulunamadı."}); return
+                event=str(data.get("iyziEventType","")).strip()
+                status="active" if event=="subscription.order.success" else "past_due"
+                database.update_subscription_status(business_id,status)
+                self.send_json(200,{"success":True}); return
+
             if self.path == "/webhook/billing":
                 signature=self.headers.get("X-Nexora-Signature","")
                 if not verify_billing_signature(raw_body,signature):
@@ -693,6 +721,13 @@ class Handler(BaseHTTPRequestHandler):
                 record=database.get_subscription_record(user[1])
                 if not record:
                     self.send_json(404,{"error":"Aktif abonelik bulunamadı."}); return
+                if record.get("provider") == "iyzico" and record.get("provider_subscription_id"):
+                    try:
+                        result=iyzico_cancel_subscription(record["provider_subscription_id"])
+                        if result.get("status") != "success":
+                            self.send_json(502,{"error":result.get("errorMessage","iyzico abonelik iptali başarısız."),"provider_response":result}); return
+                    except Exception as exc:
+                        self.send_json(502,{"error":str(exc)}); return
                 database.update_subscription_status(user[1],"cancelled",cancel_at_period_end=True,period_end=record.get("current_period_end"))
                 database.write_audit_log(user[1],user[0],"subscription_cancelled","subscription",record.get("id"),{"provider":record.get("provider","")})
                 self.send_json(200,{"success":True}); return
