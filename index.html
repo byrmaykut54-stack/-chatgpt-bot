@@ -32,7 +32,7 @@ input{width:100%;padding:11px;border:1px solid #dfe4e8;border-radius:9px;margin:
 <input id="authPassword" type="password" placeholder="Şifre (en az 8 karakter)" autocomplete="current-password" required>
 <button class="primary full" type="submit">Giriş Yap</button>
 </form>
-<button id="setupBtn" class="full" style="margin-top:8px;background:#eef2f5;display:none">İlk İşletme Hesabını Oluştur</button>
+<button id="setupBtn" class="full" type="button" style="margin-top:8px;background:#eef2f5">Yeni İşletme Hesabı Oluştur</button>
 <div id="authError" style="color:#9b2420;margin-top:12px;font-size:14px"></div>
 </div></div><div id="app" class="wrap" style="display:none">
 <div class="top"><div><h1>🤖 AI İşletme Asistanı</h1><div id="business" class="muted">İşletme bilgileri yükleniyor...</div></div><div><div class="muted" id="todayLabel"></div><button id="notifyBtn" class="install" style="margin-right:6px">🔔 Bildirimleri Aç</button><button id="installBtn" class="install" hidden>📲 Uygulamayı Yükle</button></div></div>
@@ -93,8 +93,8 @@ async function authInit(){
   if(status.authenticated){screen.style.display="none";app.style.display="block";loadDashboard();return;}
   const setup=await fetch("/api/auth/setup-available").then(r=>r.json()).catch(()=>({available:false}));
   const setupBtn=document.getElementById("setupBtn"), business=document.getElementById("authBusiness"), form=document.getElementById("authForm");
-  if(setup.available){setupBtn.style.display="block";}
-  setupBtn.onclick=()=>{business.style.display="block";business.required=true;form.querySelector("button").textContent="Hesabı Oluştur";setupBtn.style.display="none";form.dataset.mode="register";};
+  setupBtn.style.display="block";
+  setupBtn.onclick=()=>{business.style.display="block";business.required=true;form.querySelector("button").textContent="Hesabı Oluştur";setupBtn.style.display="none";form.dataset.mode="register";document.getElementById("authError").textContent="";};
   form.addEventListener("submit",async e=>{
     e.preventDefault();const mode=form.dataset.mode||"login";
     const body={email:document.getElementById("authEmail").value,password:document.getElementById("authPassword").value};
