@@ -139,6 +139,13 @@ CREATE TABLE IF NOT EXISTS rate_limits (
  hits INTEGER NOT NULL DEFAULT 0,
  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+CREATE TABLE IF NOT EXISTS appointment_reminders (
+    appointment_id TEXT NOT NULL REFERENCES appointments(id) ON DELETE CASCADE,
+    channel TEXT NOT NULL,
+    sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (appointment_id, channel)
+);
 """
 
 @contextmanager
@@ -388,6 +395,36 @@ def save_messages(config, items):
             ))
         conn.commit()
 
+
+def list_due_appointments():
+    with connection() as conn:
+        return conn.execute("""
+            SELECT a.id,a.business_id,a.customer_name,a.phone,a.date,a.time,a.service,a.note,
+                   b.name,b.config
+            FROM appointments a
+            JOIN businesses b ON b.id=a.business_id
+            WHERE a.status IN ('pending','confirmed')
+              AND NOT EXISTS (
+                  SELECT 1 FROM appointment_reminders r
+                  WHERE r.appointment_id=a.id
+              )
+        """).fetchall()
+
+def reminder_sent(appointment_id, channel):
+    with connection() as conn:
+        row = conn.execute(
+            "SELECT 1 FROM appointment_reminders WHERE appointment_id=%s AND channel=%s",
+            (appointment_id, channel)
+        ).fetchone()
+    return bool(row)
+
+def mark_reminder_sent(appointment_id, channel):
+    with connection() as conn:
+        conn.execute(
+            "INSERT INTO appointment_reminders (appointment_id,channel) VALUES (%s,%s) ON CONFLICT DO NOTHING",
+            (appointment_id, channel)
+        )
+        conn.commit()
 
 def get_business_config(business_id):
     with connection() as conn:
