@@ -44,11 +44,29 @@ def save_appointments(items):
     with open(APPOINTMENTS_PATH, "w", encoding="utf-8") as f:
         json.dump(items, f, ensure_ascii=False, indent=2)
 
-def ask_gemini(message, config):
+def gemini_request(prompt, max_tokens=1000):
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
         raise RuntimeError("GEMINI_API_KEY tanımlı değil.")
 
+    payload = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {"maxOutputTokens": max_tokens}
+    }
+    req = urllib.request.Request(
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "x-goog-api-key": api_key,
+            "Content-Type": "application/json"
+        },
+        method="POST"
+    )
+    with urllib.request.urlopen(req, timeout=60) as response:
+        data = json.load(response)
+    return data["candidates"][0]["content"]["parts"][0]["text"].strip()
+
+def ask_gemini(message, config):
     business_context = json.dumps(config, ensure_ascii=False, indent=2)
     prompt = f"""{SYSTEM_PROMPT}
 
@@ -59,22 +77,54 @@ MÜŞTERİ MESAJI:
 {message}
 
 Sadece müşteriye gönderilebilecek cevabı üret."""
+    return gemini_request(prompt, 1200)
 
-    payload = {"contents": [{"parts": [{"text": prompt}]}]}
-    req = urllib.request.Request(
-        "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent",
-        data=json.dumps(payload).encode("utf-8"),
-        headers={
-            "x-goog-api-key": api_key,
-            "Content-Type": "application/json"
-        },
-        method="POST"
-    )
+def detect_appointment_intent(message, config):
+    business_context = json.dumps(config, ensure_ascii=False)
+    prompt = f"""Bir işletme mesajını randevu açısından sınıflandır.
+Sadece geçerli JSON döndür, Markdown kullanma.
 
-    with urllib.request.urlopen(req, timeout=60) as response:
-        data = json.load(response)
+Alanlar:
+intent: "appointment" veya "other"
+customer_name: mesajda varsa isim, yoksa ""
+phone: mesajda varsa telefon, yoksa ""
+date: açıkça belirtilen tarih varsa YYYY-MM-DD, yoksa ""
+time: açıkça belirtilen saat varsa HH:MM, yoksa ""
+service: işletmenin hizmetlerinden biri veya mesajdaki hizmet, yoksa ""
+note: kısa not
 
-    return data["candidates"][0]["content"]["parts"][0]["text"].strip()
+İŞLETME:
+{business_context}
+
+MESAJ:
+{message}
+"""
+    raw = gemini_request(prompt, 600)
+    try:
+        start, end = raw.find("{"), raw.rfind("}")
+        return json.loads(raw[start:end + 1])
+    except Exception:
+        return {"intent": "other", "customer_name": "", "phone": "", "date": "", "time": "", "service": "", "note": ""}
+
+def create_appointment(data):
+    appointment = {
+        "id": datetime.utcnow().strftime("%Y%m%d%H%M%S%f"),
+        "customer_name": str(data.get("customer_name", "")).strip(),
+        "phone": str(data.get("phone", "")).strip(),
+        "date": str(data.get("date", "")).strip(),
+        "time": str(data.get("time", "")).strip(),
+        "service": str(data.get("service", "")).strip(),
+        "note": str(data.get("note", "")).strip(),
+        "status": "pending",
+        "created_at": datetime.utcnow().isoformat() + "Z"
+    }
+    required = ["customer_name", "phone", "date", "time", "service"]
+    if any(not appointment[x] for x in required):
+        return None
+    items = load_appointments()
+    items.append(appointment)
+    save_appointments(items)
+    return appointment
 
 class Handler(BaseHTTPRequestHandler):
     def send_json(self, status, payload):
@@ -132,31 +182,42 @@ class Handler(BaseHTTPRequestHandler):
                 if not message:
                     self.send_json(400, {"error": "message alanı gerekli"})
                     return
+
+                intent = detect_appointment_intent(message, load_config())
+                if intent.get("intent") == "appointment":
+                    required = ["customer_name", "phone", "date", "time", "service"]
+                    missing = [x for x in required if not str(intent.get(x, "")).strip()]
+                    if not missing:
+                        appointment = create_appointment(intent)
+                        if appointment:
+                            self.send_json(200, {
+                                "reply": f"Randevunuzu aldım. {appointment['date']} {appointment['time']} için {appointment['service']} kaydınız oluşturuldu.",
+                                "appointment": appointment
+                            })
+                            return
+
+                    labels = {
+                        "customer_name": "adınızı",
+                        "phone": "telefon numaranızı",
+                        "date": "tarihi",
+                        "time": "saati",
+                        "service": "hizmeti"
+                    }
+                    missing_text = ", ".join(labels[x] for x in missing)
+                    self.send_json(200, {
+                        "reply": f"Randevu oluşturabilmem için lütfen {missing_text} bilgisini de paylaşır mısınız?"
+                    })
+                    return
+
                 answer = ask_gemini(message, load_config())
                 self.send_json(200, {"reply": answer})
                 return
 
             if self.path == "/api/appointments":
-                required = ["customer_name", "phone", "date", "time", "service"]
-                missing = [x for x in required if not str(data.get(x, "")).strip()]
-                if missing:
-                    self.send_json(400, {"error": "Eksik alanlar", "fields": missing})
+                appointment = create_appointment(data)
+                if not appointment:
+                    self.send_json(400, {"error": "customer_name, phone, date, time ve service zorunlu"})
                     return
-
-                appointment = {
-                    "id": datetime.utcnow().strftime("%Y%m%d%H%M%S%f"),
-                    "customer_name": str(data["customer_name"]).strip(),
-                    "phone": str(data["phone"]).strip(),
-                    "date": str(data["date"]).strip(),
-                    "time": str(data["time"]).strip(),
-                    "service": str(data["service"]).strip(),
-                    "note": str(data.get("note", "")).strip(),
-                    "status": "pending",
-                    "created_at": datetime.utcnow().isoformat() + "Z"
-                }
-                items = load_appointments()
-                items.append(appointment)
-                save_appointments(items)
                 self.send_json(201, appointment)
                 return
 
@@ -168,17 +229,13 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_json(400, {"error": "Geçersiz id veya durum"})
                     return
                 items = load_appointments()
-                found = False
                 for item in items:
                     if item["id"] == appointment_id:
                         item["status"] = status
-                        found = True
-                        break
-                if not found:
-                    self.send_json(404, {"error": "Randevu bulunamadı"})
-                    return
-                save_appointments(items)
-                self.send_json(200, {"success": True})
+                        save_appointments(items)
+                        self.send_json(200, {"success": True})
+                        return
+                self.send_json(404, {"error": "Randevu bulunamadı"})
                 return
 
             self.send_json(404, {"error": "Not found"})
