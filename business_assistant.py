@@ -458,11 +458,20 @@ def handle_customer_message(message, channel="web", customer_name="", phone="", 
 
     return {"reply": ask_gemini(message, config)}
 
-def send_whatsapp_text(to, message):
-    token = os.environ.get("WHATSAPP_ACCESS_TOKEN")
-    phone_number_id = os.environ.get("WHATSAPP_PHONE_NUMBER_ID")
+def send_whatsapp_text(to, message, business_id=None):
+    token = ""
+    phone_number_id = ""
+    if business_id is not None and database_enabled():
+        credentials = database.get_business_whatsapp(business_id)
+        token = str(credentials.get("access_token", "")).strip()
+        phone_number_id = str(credentials.get("phone_number_id", "")).strip()
+    # Backward-compatible fallback for the original single-business deployment.
+    if not token:
+        token = os.environ.get("WHATSAPP_ACCESS_TOKEN", "").strip()
+    if not phone_number_id:
+        phone_number_id = os.environ.get("WHATSAPP_PHONE_NUMBER_ID", "").strip()
     if not token or not phone_number_id:
-        return False, "WhatsApp erişim bilgileri tanımlı değil."
+        return False, "Bu işletme için WhatsApp bağlantısı yapılandırılmamış."
 
     url = f"https://graph.facebook.com/v23.0/{phone_number_id}/messages"
     payload = {"messaging_product": "whatsapp", "to": to, "type": "text", "text": {"preview_url": False, "body": message}}
@@ -488,8 +497,13 @@ def whatsapp_business_id(data):
         phone_number_id = str(data["entry"][0]["changes"][0]["value"]["metadata"]["phone_number_id"]).strip()
     except (KeyError, IndexError, TypeError):
         return None
+    if database_enabled() and phone_number_id:
+        business_id = database.find_business_by_whatsapp_phone_number_id(phone_number_id)
+        if business_id:
+            return business_id
+    # Backward-compatible fallback for legacy single/multi-business env mapping.
     mapping = os.environ.get("WHATSAPP_BUSINESS_MAP", "").strip()
-    if not mapping or not database_enabled():
+    if not mapping:
         return None
     try:
         parsed = json.loads(mapping)
@@ -629,7 +643,12 @@ class Handler(BaseHTTPRequestHandler):
             if not user: return
             if not user_can(user,"business_settings"):
                 self.send_json(403,{"error":"İşletme ayarlarına erişim yetkiniz yok."}); return
-            self.send_json(200, business_config_for_user(user)); return
+            config=dict(business_config_for_user(user))
+            whatsapp=database.get_business_whatsapp(user[1]) if database_enabled() else {"phone_number_id":"","access_token":""}
+            config["whatsapp_phone_number_id"]=whatsapp.get("phone_number_id","")
+            config["whatsapp_connected"]=bool(whatsapp.get("phone_number_id") and whatsapp.get("access_token"))
+            config.pop("whatsapp_access_token", None)
+            self.send_json(200, config); return
         if parsed.path == "/api/appointments":
             user=auth_required(self)
             if not user: return
@@ -846,7 +865,7 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_json(200, {"received": True, "processed": False, "duplicate": True}); return
                 whatsapp_user = (0, business_id, "", "owner", "", database.get_business_config(business_id))
                 result = handle_customer_message(incoming["message"], "whatsapp", incoming["customer_name"], incoming["phone"], whatsapp_user)
-                ok, send_result = send_whatsapp_text(incoming["phone"], result["reply"])
+                ok, send_result = send_whatsapp_text(incoming["phone"], result["reply"], business_id)
                 out = {"received": True, "processed": True, "result": result, "reply_sent": ok}
                 if not ok:
                     out["reply_error"] = send_result
@@ -954,8 +973,17 @@ class Handler(BaseHTTPRequestHandler):
                 if name: config["business_name"]=name
                 if not str(config.get("business_name","")).strip():
                     self.send_json(400,{"error":"İşletme adı gerekli"}); return
+                whatsapp_phone_number_id=data.get("whatsapp_phone_number_id", config.get("whatsapp_phone_number_id"))
+                whatsapp_access_token=data.get("whatsapp_access_token")
+                if whatsapp_phone_number_id is not None:
+                    database.update_business_whatsapp(user[1], whatsapp_phone_number_id=whatsapp_phone_number_id, access_token=whatsapp_access_token)
+                config.pop("whatsapp_access_token", None)
+                config.pop("whatsapp_phone_number_id", None)
                 database.update_business(user[1], str(config["business_name"]), config)
-                self.send_json(200, config); return
+                saved=dict(config)
+                saved["whatsapp_phone_number_id"]=database.get_business_whatsapp(user[1]).get("phone_number_id","")
+                saved["whatsapp_connected"]=bool(database.get_business_whatsapp(user[1]).get("phone_number_id") and database.get_business_whatsapp(user[1]).get("access_token"))
+                self.send_json(200, saved); return
 
             if self.path == "/api/appointments":
                 user=auth_required(self)
