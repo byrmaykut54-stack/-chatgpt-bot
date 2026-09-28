@@ -2,8 +2,11 @@ name: Gemini GitHub Code Review
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
+    inputs:
+      pr_number:
+        description: "Pull request number to review"
+        required: true
+        type: string
   pull_request:
     types: [opened, synchronize, reopened]
 
@@ -61,11 +64,11 @@ PR DIFF:
 
               payload = {
                   "contents": [{"parts": [{"text": prompt}]}],
-                  "generationConfig": {"temperature": 0.2, "maxOutputTokens": 2000}
+                  "generationConfig": {"maxOutputTokens": 2000}
               }
 
               req = urllib.request.Request(
-                  "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent",
+                  "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent",
                   data=json.dumps(payload).encode("utf-8"),
                   headers={
                       "x-goog-api-key": os.environ["GEMINI_API_KEY"],
