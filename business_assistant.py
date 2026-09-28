@@ -522,10 +522,10 @@ class Handler(BaseHTTPRequestHandler):
                 if not user or not verify_password(password,user[3]):
                     self.send_json(401,{"error":"E-posta veya şifre hatalı."}); return
                 token=os.urandom(32).hex()
-                expires=(datetime.now(timezone.utc)+timedelta(days=30)).isoformat()
+                expires=None
                 database.create_session(hashlib.sha256(token.encode("utf-8")).hexdigest(),user[0],expires)
                 self.send_response(200)
-                self.send_header("Set-Cookie","session="+token+"; HttpOnly; SameSite=Lax; Path=/; Max-Age=2592000")
+                self.send_header("Set-Cookie","session="+token+"; HttpOnly; SameSite=Lax; Path=/; Expires=Fri, 31 Dec 2099 23:59:59 GMT")
                 self.send_header("Content-Type","application/json; charset=utf-8")
                 body=json.dumps({"success":True,"email":user[2]},ensure_ascii=False).encode("utf-8")
                 self.send_header("Content-Length",str(len(body))); self.end_headers(); self.wfile.write(body); return
@@ -533,7 +533,7 @@ class Handler(BaseHTTPRequestHandler):
             if self.path == "/api/auth/logout":
                 token=cookie_token(self)
                 if token and database_enabled():
-                    database.delete_session(hashlib.sha256(token.encode("utf-8")).hexdigest())
+                    database.revoke_session(hashlib.sha256(token.encode("utf-8")).hexdigest())
                 self.send_response(200)
                 self.send_header("Set-Cookie","session=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0")
                 self.send_header("Content-Type","application/json; charset=utf-8")
