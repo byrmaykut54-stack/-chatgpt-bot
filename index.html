@@ -23,7 +23,18 @@ input{width:100%;padding:11px;border:1px solid #dfe4e8;border-radius:9px;margin:
 @media(max-width:800px){.wrap{padding:14px}.grid{grid-template-columns:repeat(2,1fr);gap:10px}.card{padding:14px;border-radius:14px}.layout{grid-template-columns:1fr}.top{display:block}.top h1{font-size:25px}.stat{font-size:26px}table{min-width:650px}.scroll{overflow-x:auto}.install{width:100%;padding:11px}.chatform{position:sticky;bottom:0;background:#fff;padding-top:8px}.chat{height:320px}}
 </style>
 </head>
-<body><div class="wrap">
+<body><div id="authScreen" style="position:fixed;inset:0;background:#f4f6f8;z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px">
+<div style="width:100%;max-width:430px;background:#fff;border:1px solid #e8ebee;border-radius:20px;padding:24px;box-shadow:0 10px 40px #00000012">
+<h1 style="margin:0 0 6px">🤖 AI İşletme Asistanı</h1><div class="muted" style="margin-bottom:18px">İşletme panelinize giriş yapın</div>
+<form id="authForm">
+<input id="authBusiness" placeholder="İşletme adı" autocomplete="organization" style="display:none">
+<input id="authEmail" type="email" placeholder="E-posta" autocomplete="email" required>
+<input id="authPassword" type="password" placeholder="Şifre (en az 8 karakter)" autocomplete="current-password" required>
+<button class="primary full" type="submit">Giriş Yap</button>
+</form>
+<button id="setupBtn" class="full" style="margin-top:8px;background:#eef2f5;display:none">İlk İşletme Hesabını Oluştur</button>
+<div id="authError" style="color:#9b2420;margin-top:12px;font-size:14px"></div>
+</div></div><div id="app" class="wrap" style="display:none">
 <div class="top"><div><h1>🤖 AI İşletme Asistanı</h1><div id="business" class="muted">İşletme bilgileri yükleniyor...</div></div><div><div class="muted" id="todayLabel"></div><button id="installBtn" class="install" hidden>📲 Uygulamayı Yükle</button></div></div>
 <div class="grid">
 <div class="card"><div class="label">BUGÜNÜN RANDEVULARI</div><div class="stat" id="todayCount">0</div></div>
@@ -62,5 +73,23 @@ document.getElementById("chatForm").addEventListener("submit",async e=>{e.preven
 
 document.getElementById("appointmentForm").addEventListener("submit",async e=>{e.preventDefault();const data={customer_name:document.getElementById("customer_name").value,phone:document.getElementById("phone").value,date:document.getElementById("date").value,time:document.getElementById("time").value,service:document.getElementById("service").value};const r=await fetch("/api/appointments",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(data)});if(r.ok){e.target.reset();loadDashboard();alert("Randevu kaydedildi.");}else{const x=await r.json();alert(x.error||"Randevu kaydedilemedi.");}});
 let deferredPrompt;window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferredPrompt=e;document.getElementById("installBtn").hidden=false;});document.getElementById("installBtn").addEventListener("click",async()=>{if(!deferredPrompt)return;deferredPrompt.prompt();await deferredPrompt.userChoice;deferredPrompt=null;document.getElementById("installBtn").hidden=true;});if("serviceWorker" in navigator)navigator.serviceWorker.register("./service-worker.js").catch(()=>{});
-loadDashboard();
+async function authInit(){
+  const status=await fetch("/api/auth/status").then(r=>r.json()).catch(()=>({authenticated:false}));
+  const screen=document.getElementById("authScreen"), app=document.getElementById("app");
+  if(status.authenticated){screen.style.display="none";app.style.display="block";loadDashboard();return;}
+  const setup=await fetch("/api/auth/setup-available").then(r=>r.json()).catch(()=>({available:false}));
+  const setupBtn=document.getElementById("setupBtn"), business=document.getElementById("authBusiness"), form=document.getElementById("authForm");
+  if(setup.available){setupBtn.style.display="block";}
+  setupBtn.onclick=()=>{business.style.display="block";business.required=true;form.querySelector("button").textContent="Hesabı Oluştur";setupBtn.style.display="none";form.dataset.mode="register";};
+  form.addEventListener("submit",async e=>{
+    e.preventDefault();const mode=form.dataset.mode||"login";
+    const body={email:document.getElementById("authEmail").value,password:document.getElementById("authPassword").value};
+    if(mode==="register")body.business_name=business.value.trim()||"Demo İşletme";
+    const r=await fetch(mode==="register"?"/api/auth/register":"/api/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+    const x=await r.json().catch(()=>({}));
+    if(!r.ok){document.getElementById("authError").textContent=x.error||"İşlem başarısız.";return;}
+    location.reload();
+  });
+}
+authInit();
 </script></body></html>
