@@ -7,6 +7,7 @@ import urllib.request
 from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import parse_qs, urlparse
+from collections import defaultdict
 
 CONFIG_PATH = "business_config.json"
 HTML_PATH = "index.html"
@@ -30,6 +31,10 @@ DEFAULT_CONFIG = {
     "address": "İşletme adresini config dosyasına yazın",
     "tone": "samimi, kısa ve profesyonel"
 }
+
+RATE_LIMITS = defaultdict(list)
+RATE_LIMIT_WINDOW = 60
+RATE_LIMIT_MAX = 20
 
 SYSTEM_PROMPT = """Sen bir küçük işletme müşteri iletişim asistanısın.
 İşletmenin verdiği bilgilere sadık kal. Bilgi yoksa uydurma.
@@ -83,6 +88,16 @@ def current_user(handler):
     if not database_enabled(): return None
     token = cookie_token(handler)
     return database.get_session_user(hashlib.sha256(token.encode("utf-8")).hexdigest()) if token else None
+
+def rate_limited(key, limit=RATE_LIMIT_MAX, window=RATE_LIMIT_WINDOW):
+    now = datetime.now(timezone.utc).timestamp()
+    values = [x for x in RATE_LIMITS[key] if now - x < window]
+    if len(values) >= limit:
+        RATE_LIMITS[key] = values
+        return True
+    values.append(now)
+    RATE_LIMITS[key] = values
+    return False
 
 def auth_required(handler):
     user = current_user(handler)
@@ -247,8 +262,7 @@ def local_intent_hint(message, config):
         today = datetime.now().strftime("%Y-%m-%d") if time_text and any(word in text for word in ("boş", "müsait", "uygun")) else ""
 
         return {
-            "intent": "availability" if any(word in text for word in ("boş", "müsait", "uygun")) else "appointment",
-            "customer_name": "",
+            "intent": "availability" if any(word in text for word in ("boş", "müsait", "uygun")) else "appointment",            "customer_name": "",
             "phone": "",
             "date": today,
             "time": time_text,
@@ -392,6 +406,21 @@ def whatsapp_verify(query):
         return 200, challenge
     return 403, "Webhook doğrulaması başarısız"
 
+def whatsapp_business_id(data):
+    try:
+        phone_number_id = str(data["entry"][0]["changes"][0]["value"]["metadata"]["phone_number_id"]).strip()
+    except (KeyError, IndexError, TypeError):
+        return None
+    mapping = os.environ.get("WHATSAPP_BUSINESS_MAP", "").strip()
+    if not mapping or not database_enabled():
+        return None
+    try:
+        parsed = json.loads(mapping)
+        value = parsed.get(phone_number_id)
+        return int(value) if value is not None else None
+    except (ValueError, TypeError, json.JSONDecodeError):
+        return None
+
 def verify_whatsapp_signature(raw_body, signature):
     secret = os.environ.get("META_APP_SECRET", "").strip()
     if not secret:
@@ -401,10 +430,10 @@ def verify_whatsapp_signature(raw_body, signature):
     expected = "sha256=" + hmac.new(secret.encode("utf-8"), raw_body, hashlib.sha256).hexdigest()
     return hmac.compare_digest(expected, signature)
 
-def whatsapp_message_already_processed(message_id):
-    if not message_id:
+def whatsapp_message_already_processed(message_id, business_id=None):
+    if not message_id or business_id is None:
         return False
-    return any(item.get("message_id") == message_id for item in load_messages())
+    return any(item.get("message_id") == message_id for item in database.load_messages_by_business(business_id))
 
 def parse_whatsapp_message(data):
     try:
@@ -497,8 +526,7 @@ class Handler(BaseHTTPRequestHandler):
             if not user_can(user,"appointments"):
                 self.send_json(403,{"error":"Randevulara erişim yetkiniz yok."}); return
             self.send_json(200, load_appointments(user)); return
-        if parsed.path == "/api/messages":
-            user=auth_required(self)
+        if parsed.path == "/api/messages":            user=auth_required(self)
             if not user: return
             if not user_can(user,"messages"):
                 self.send_json(403,{"error":"Mesajlara erişim yetkiniz yok."}); return
@@ -575,7 +603,7 @@ class Handler(BaseHTTPRequestHandler):
                 expires=None
                 database.create_session(hashlib.sha256(token.encode("utf-8")).hexdigest(),user[0],expires)
                 self.send_response(200)
-                self.send_header("Set-Cookie","session="+token+"; HttpOnly; SameSite=Lax; Path=/; Expires=Fri, 31 Dec 2099 23:59:59 GMT")
+                self.send_header("Set-Cookie","session="+token+"; HttpOnly; SameSite=Lax; Path=/; Secure; Expires=Fri, 31 Dec 2099 23:59:59 GMT")
                 self.send_header("Content-Type","application/json; charset=utf-8")
                 body=json.dumps({"success":True,"email":user[2]},ensure_ascii=False).encode("utf-8")
                 self.send_header("Content-Length",str(len(body))); self.end_headers(); self.wfile.write(body); return
