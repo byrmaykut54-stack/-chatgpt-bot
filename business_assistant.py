@@ -531,6 +531,23 @@ class Handler(BaseHTTPRequestHandler):
                 uid=database.create_user(email,hash_password(password),user[1],role)
                 self.send_json(201,{"id":uid,"email":email,"role":role}); return
 
+            if self.path == "/api/users/permissions":
+                user=auth_required(self)
+                if not user: return
+                if user[3] != "owner":
+                    self.send_json(403,{"error":"Sadece işletme sahibi yetki değiştirebilir."}); return
+                target=int(data.get("user_id",0))
+                allowed={"appointments","customers","messages","business_settings","team","reports"}
+                incoming=data.get("permissions")
+                if not isinstance(incoming,dict):
+                    self.send_json(400,{"error":"permissions gerekli"}); return
+                permissions={k:bool(incoming.get(k,False)) for k in allowed}
+                if target == user[0]:
+                    self.send_json(400,{"error":"Kendi owner yetkilerinizi bu ekrandan değiştirmeyin."}); return
+                if not database.update_user_permissions(user[1],target,permissions):
+                    self.send_json(404,{"error":"Çalışan bulunamadı"}); return
+                self.send_json(200,{"success":True,"permissions":permissions}); return
+
             if self.path == "/api/users/role":
                 user=auth_required(self)
                 if not user: return
