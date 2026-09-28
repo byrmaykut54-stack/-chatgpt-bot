@@ -45,7 +45,7 @@ input{width:100%;padding:12px 13px;border:1px solid #e0e5ea;background:#fbfcfd;b
 <div class="card"><div class="label">BEKLEYEN</div><div class="stat" id="pendingCount">0</div></div>
 <div class="card"><div class="label">ONAYLANAN</div><div class="stat" id="confirmedCount">0</div></div>
 <div class="card"><div class="label">MÜŞTERİLER</div><div class="stat" id="customerCount">0</div></div>
-<div class="card"><div class="label">MESAJLAR</div><div class="stat" id="messageCount">0</div></div>
+<div class="card"><div class="label">MESAJLAR</div><div class="stat" id="messageCount">0</div></div><div class="card"><div class="label">ABONELİK</div><div class="stat" id="subscriptionPlan">TRIAL</div><div id="subscriptionInfo" class="muted" style="font-size:11px;margin-top:5px"></div><button id="proBtn" class="primary full" style="margin-top:10px">Pro'ya Geç</button></div>
 </div>
 <div class="layout"><main>
 <div class="card"><h2>📥 Müşteri Mesajları</h2><div id="messages" class="muted">Yükleniyor...</div></div>
@@ -77,6 +77,17 @@ function badge(status){const l={pending:"Bekliyor",confirmed:"Onaylandı",cancel
 async function setStatus(id,status){const r=await fetch("/api/appointments/status",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id,status})});if(!r.ok){alert("Durum güncellenemedi.");return}loadDashboard();}
 function actionButtons(x){return x.status==="pending"?'<button class="approve" onclick="setStatus(\''+escapeHtml(x.id)+'\',\'confirmed\')">✓ Onayla</button><button class="cancel" onclick="setStatus(\''+escapeHtml(x.id)+'\',\'cancelled\')">✕ İptal</button>':"";}
 function appointmentTable(items){if(!items.length)return '<div class="muted">Randevu bulunmuyor.</div>';return '<div class="scroll"><table><tr><th>Müşteri</th><th>Saat</th><th>Hizmet</th><th>Durum</th><th>İşlem</th></tr>'+items.map(x=>'<tr><td>'+escapeHtml(x.customer_name)+'</td><td>'+escapeHtml(x.time)+'</td><td>'+escapeHtml(x.service)+'</td><td>'+badge(x.status)+'</td><td>'+actionButtons(x)+'</td></tr>').join("")+"</table></div>";}
+async function loadSubscription(){
+ const r=await fetch("/api/subscription"); if(!r.ok)return;
+ const s=await r.json(); const plan=(s.plan||"trial").toUpperCase();
+ document.getElementById("subscriptionPlan").textContent=plan==="PRO"?"PRO":"TRIAL";
+ const info=document.getElementById("subscriptionInfo");
+ if(plan==="PRO"){info.textContent=s.subscription&&s.subscription.current_period_end?"Dönem sonu: "+new Date(s.subscription.current_period_end).toLocaleDateString("tr-TR"):"Aktif Pro abonelik";}
+ else if(s.trial_ends_at){info.textContent="Deneme sonu: "+new Date(s.trial_ends_at).toLocaleDateString("tr-TR");}
+ const btn=document.getElementById("proBtn");
+ btn.textContent=plan==="PRO"?"Aboneliği İptal Et":"Pro'ya Geç";
+ btn.onclick=async()=>{const endpoint=plan==="PRO"?"/api/billing/cancel":"/api/billing/start"; const r=await fetch(endpoint,{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"}); const x=await r.json().catch(()=>({})); if(r.ok&&x.checkout_url){window.location.href=x.checkout_url;return;} if(r.ok){alert("İşlem tamamlandı.");loadSubscription();return;} alert(x.error||"İşlem gerçekleştirilemedi.");};
+}
 async function loadDashboard(){
  const [ar,mr,cr,rr]=await Promise.all([fetch("/api/appointments"),fetch("/api/messages"),fetch("/api/customers"),fetch("/api/reports")]);const items=ar.ok?await ar.json():[],messages=mr.ok?await mr.json():[],customers=cr.ok?await cr.json():[],report=rr.ok?await rr.json():null;
  checkAppointmentNotifications(items); checkUpcomingReminders(items);
@@ -95,7 +106,7 @@ let deferredPrompt;window.addEventListener("beforeinstallprompt",e=>{e.preventDe
 async function authInit(){
   const status=await fetch("/api/auth/status").then(r=>r.json()).catch(()=>({authenticated:false}));
   const screen=document.getElementById("authScreen"), app=document.getElementById("app");
-  if(status.authenticated){screen.style.display="none";app.style.display="block";loadDashboard();return;}
+  if(status.authenticated){screen.style.display="none";app.style.display="block";loadSubscription();loadDashboard();return;}
   const setup=await fetch("/api/auth/setup-available").then(r=>r.json()).catch(()=>({available:false}));
   const setupBtn=document.getElementById("setupBtn"), business=document.getElementById("authBusiness"), form=document.getElementById("authForm");
   setupBtn.style.display="block";
