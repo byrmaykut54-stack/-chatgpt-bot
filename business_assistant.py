@@ -3,6 +3,7 @@ import os
 import urllib.request
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from urllib.parse import parse_qs, urlparse
 
 CONFIG_PATH = "business_config.json"
 HTML_PATH = "index.html"
@@ -151,14 +152,39 @@ def handle_customer_message(message, channel="web", customer_name="", phone=""):
         if not missing:
             appointment = create_appointment(intent)
             if appointment:
-                return {
-                    "reply": f"Randevunuzu aldım. {appointment['date']} {appointment['time']} için {appointment['service']} kaydınız oluşturuldu.",
-                    "appointment": appointment
-                }
+                return {"reply": f"Randevunuzu aldım. {appointment['date']} {appointment['time']} için {appointment['service']} kaydınız oluşturuldu.", "appointment": appointment}
         labels = {"customer_name":"adınızı","phone":"telefon numaranızı","date":"tarihi","time":"saati","service":"hizmeti"}
         return {"reply": "Randevu oluşturabilmem için lütfen " + ", ".join(labels[x] for x in missing) + " bilgisini de paylaşır mısınız?"}
 
     return {"reply": ask_gemini(message, config)}
+
+def whatsapp_verify(query):
+    params = parse_qs(query)
+    mode = params.get("hub.mode", [""])[0]
+    token = params.get("hub.verify_token", [""])[0]
+    challenge = params.get("hub.challenge", [""])[0]
+    expected = os.environ.get("WHATSAPP_VERIFY_TOKEN", "")
+    if mode == "subscribe" and expected and token == expected:
+        return 200, challenge
+    return 403, "Webhook doğrulaması başarısız"
+
+def parse_whatsapp_message(data):
+    try:
+        value = data["entry"][0]["changes"][0]["value"]
+        messages = value.get("messages", [])
+        if not messages:
+            return None
+        msg = messages[0]
+        if msg.get("type") != "text":
+            return None
+        return {
+            "message": msg["text"]["body"],
+            "phone": msg.get("from", ""),
+            "customer_name": value.get("contacts", [{}])[0].get("profile", {}).get("name", ""),
+            "message_id": msg.get("id", "")
+        }
+    except (KeyError, IndexError, TypeError):
+        return None
 
 class Handler(BaseHTTPRequestHandler):
     def send_json(self, status, payload):
@@ -178,7 +204,16 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self):
-        if self.path in ("/", "/index.html"):
+        parsed = urlparse(self.path)
+        if parsed.path == "/webhook/whatsapp":
+            status, body = whatsapp_verify(parsed.query)
+            self.send_response(status)
+            self.send_header("Content-Type", "text/plain; charset=utf-8")
+            self.send_header("Content-Length", str(len(body.encode("utf-8"))))
+            self.end_headers()
+            self.wfile.write(body.encode("utf-8"))
+            return
+        if parsed.path in ("/", "/index.html"):
             try:
                 with open(HTML_PATH, "rb") as f:
                     body = f.read()
@@ -190,13 +225,13 @@ class Handler(BaseHTTPRequestHandler):
             except FileNotFoundError:
                 self.send_json(404, {"error": "index.html bulunamadı"})
             return
-        if self.path == "/api/business":
+        if parsed.path == "/api/business":
             self.send_json(200, load_config()); return
-        if self.path == "/api/appointments":
+        if parsed.path == "/api/appointments":
             self.send_json(200, load_appointments()); return
-        if self.path == "/api/messages":
+        if parsed.path == "/api/messages":
             self.send_json(200, load_messages()); return
-        if self.path == "/health":
+        if parsed.path == "/health":
             self.send_json(200, {"status": "ok", "service": "AI İşletme Asistanı"}); return
         self.send_json(404, {"error": "Not found"})
 
@@ -205,16 +240,23 @@ class Handler(BaseHTTPRequestHandler):
             length = int(self.headers.get("Content-Length", "0"))
             data = json.loads(self.rfile.read(length) or "{}")
 
+            if self.path == "/webhook/whatsapp":
+                incoming = parse_whatsapp_message(data)
+                if not incoming:
+                    self.send_json(200, {"received": True, "processed": False})
+                    return
+                result = handle_customer_message(
+                    incoming["message"], "whatsapp",
+                    incoming["customer_name"], incoming["phone"]
+                )
+                self.send_json(200, {"received": True, "processed": True, "result": result})
+                return
+
             if self.path in ("/chat", "/webhook/message"):
                 message = str(data.get("message", "")).strip()
                 if not message:
                     self.send_json(400, {"error": "message alanı gerekli"}); return
-                result = handle_customer_message(
-                    message,
-                    channel=str(data.get("channel", "web")).strip() or "web",
-                    customer_name=str(data.get("customer_name", "")).strip(),
-                    phone=str(data.get("phone", "")).strip()
-                )
+                result = handle_customer_message(message, str(data.get("channel", "web")).strip() or "web", str(data.get("customer_name", "")).strip(), str(data.get("phone", "")).strip())
                 self.send_json(200, result); return
 
             if self.path == "/api/appointments":
