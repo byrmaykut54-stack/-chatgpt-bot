@@ -552,7 +552,12 @@ class Handler(BaseHTTPRequestHandler):
         if parsed.path == "/api/auth/setup-available":
             self.send_json(200,{"available":database_enabled() and database.count_users()==0}); return
         if parsed.path == "/api/plans":
-            self.send_json(200,{"plans":[{"id":"trial","name":"14 Gün Deneme","price":0,"features":["Randevu yönetimi","Müşteri yönetimi","AI müşteri asistanı","Ekip ve yetkiler"]},{"id":"pro","name":"NEXORA Pro","price":0,"price_note":"Fiyatlandırma bağlantısı hazırlanıyor","features":["Tüm deneme özellikleri","WhatsApp entegrasyonu","Gelişmiş raporlar","Öncelikli destek"]}]}); return
+            price=os.environ.get("NEXORA_PRO_PRICE","").strip()
+            self.send_json(200,{"plans":[{"id":"trial","name":"14 Gün Deneme","price":0,"features":["Randevu yönetimi","Müşteri yönetimi","AI müşteri asistanı","Ekip ve yetkiler"]},{"id":"pro","name":"NEXORA Pro","price":price or None,"price_note":"" if price else "Fiyatlandırma yapılandırılıyor","features":["Tüm deneme özellikleri","WhatsApp entegrasyonu","Gelişmiş raporlar","Öncelikli destek"]}]}); return
+        if parsed.path == "/api/subscription":
+            user=auth_required(self)
+            if not user: return
+            self.send_json(200,subscription_payload(user[1])); return
         if parsed.path == "/api/business":
             user=auth_required(self)
             if not user: return
