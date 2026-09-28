@@ -96,6 +96,7 @@ def ensure_schema():
         return
     with connection() as conn:
         conn.execute(SCHEMA)
+        conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS permissions JSONB NOT NULL DEFAULT '{}'::jsonb")
         conn.commit()
 
 def create_business(name, config):
