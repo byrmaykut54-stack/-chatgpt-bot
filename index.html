@@ -1,20 +1,26 @@
 <!doctype html>
 <html lang="tr">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#17202a"><link rel="manifest" href="./manifest.webmanifest">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#17202a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="İşletme Asistanı">
+<link rel="apple-touch-icon" href="./app-icon.svg">
+<link rel="manifest" href="./manifest.webmanifest">
 <title>AI İşletme Asistanı • Yönetim Paneli</title>
 <style>
-*{box-sizing:border-box}body{font-family:Inter,Arial,sans-serif;margin:0;background:#f4f6f8;color:#17202a}.wrap{max-width:1180px;margin:auto;padding:22px}
+*{box-sizing:border-box}body{font-family:Inter,Arial,sans-serif;margin:0;background:#f4f6f8;color:#17202a;padding-bottom:env(safe-area-inset-bottom)}.wrap{max-width:1180px;margin:auto;padding:22px}
 .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}h1,h2{margin:0 0 8px}.muted{color:#68737d}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px}
 .card{background:#fff;border-radius:16px;padding:18px;box-shadow:0 4px 18px #0000000d;border:1px solid #e8ebee}.stat{font-size:30px;font-weight:800}.label{font-size:13px;color:#68737d}
 .layout{display:grid;grid-template-columns:2fr 1fr;gap:18px}table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:10px 8px;border-bottom:1px solid #edf0f2;font-size:14px;vertical-align:middle}
 .badge{display:inline-block;padding:5px 9px;border-radius:999px;font-size:12px;font-weight:700}.pending{background:#fff3cd;color:#7a5b00}.confirmed{background:#dff7e8;color:#146c36}.cancelled{background:#fde2e1;color:#9b2420}
 button{border:0;border-radius:9px;padding:8px 10px;cursor:pointer;font-weight:700}.approve{background:#e0f5e8}.cancel{background:#fde5e4;margin-left:5px}.primary{background:#17202a;color:#fff}.full{width:100%}
-input{width:100%;padding:11px;border:1px solid #dfe4e8;border-radius:9px;margin:5px 0 10px;font-size:14px}.chat{height:280px;overflow:auto;background:#f8fafb;border-radius:12px;padding:10px}
+input{width:100%;padding:11px;border:1px solid #dfe4e8;border-radius:9px;margin:5px 0 10px;font-size:16px}.chat{height:280px;overflow:auto;background:#f8fafb;border-radius:12px;padding:10px}
 .msg{padding:10px 12px;margin:7px 0;border-radius:11px;white-space:pre-wrap}.user{background:#e8f2ff}.bot{background:#eaf8ee}.chatform{display:flex;gap:8px;margin-top:10px}.chatform input{margin:0}.install{background:#17202a;color:#fff;margin-top:8px}
 .channel{font-size:11px;text-transform:uppercase;color:#68737d}.message{max-width:560px}.unread{font-weight:800}.pill{display:inline-block;margin-left:5px;padding:3px 7px;border-radius:10px;background:#e8f2ff;font-size:11px}
-@media(max-width:800px){.grid{grid-template-columns:repeat(2,1fr)}.layout{grid-template-columns:1fr}.top{display:block}table{min-width:650px}.scroll{overflow-x:auto}}
+@media(max-width:800px){.wrap{padding:14px}.grid{grid-template-columns:repeat(2,1fr);gap:10px}.card{padding:14px;border-radius:14px}.layout{grid-template-columns:1fr}.top{display:block}.top h1{font-size:25px}.stat{font-size:26px}table{min-width:650px}.scroll{overflow-x:auto}.install{width:100%;padding:11px}.chatform{position:sticky;bottom:0;background:#fff;padding-top:8px}.chat{height:320px}}
 </style>
 </head>
 <body><div class="wrap">
@@ -35,24 +41,26 @@ input{width:100%;padding:11px;border:1px solid #dfe4e8;border-radius:9px;margin:
 <div class="card"><h2>➕ Randevu Ekle</h2><form id="appointmentForm"><input id="customer_name" placeholder="Müşteri adı" required><input id="phone" placeholder="Telefon" required><input id="date" type="date" required><input id="time" type="time" required><input id="service" placeholder="Hizmet" required><button class="primary full">Randevuyu Kaydet</button></form></div>
 </aside></div></div>
 <script>
-const today=new Date().toISOString().slice(0,10);
+function localDateISO(){const d=new Date();const y=d.getFullYear();const m=String(d.getMonth()+1).padStart(2,"0");const day=String(d.getDate()).padStart(2,"0");return y+"-"+m+"-"+day}
+const today=localDateISO();
 document.getElementById("todayLabel").textContent=new Date().toLocaleDateString("tr-TR",{weekday:"long",year:"numeric",month:"long",day:"numeric"});
 function escapeHtml(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[c]));}
-function badge(status){const l={pending:"Bekliyor",confirmed:"Onaylandı",cancelled:"İptal",completed:"Tamamlandı"}[status]||status;return '<span class="badge '+escapeHtml(status)+'">'+escapeHtml(l)+'</span>';}
+function badge(status){const l={pending:"Bekliyor",confirmed:"Onaylandı",cancelled:"İptal",completed:"Tamamlandı"}[status]||status;return '<span class="badge '+escapeHtml(status)+'">'+escapeHtml(l)+"</span>";}
 async function setStatus(id,status){const r=await fetch("/api/appointments/status",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id,status})});if(!r.ok){alert("Durum güncellenemedi.");return}loadDashboard();}
 function actionButtons(x){return x.status==="pending"?'<button class="approve" onclick="setStatus(\''+escapeHtml(x.id)+'\',\'confirmed\')">✓ Onayla</button><button class="cancel" onclick="setStatus(\''+escapeHtml(x.id)+'\',\'cancelled\')">✕ İptal</button>':"";}
-function appointmentTable(items){if(!items.length)return '<div class="muted">Randevu bulunmuyor.</div>';return '<div class="scroll"><table><tr><th>Müşteri</th><th>Saat</th><th>Hizmet</th><th>Durum</th><th>İşlem</th></tr>'+items.map(x=>'<tr><td>'+escapeHtml(x.customer_name)+'</td><td>'+escapeHtml(x.time)+'</td><td>'+escapeHtml(x.service)+'</td><td>'+badge(x.status)+'</td><td>'+actionButtons(x)+'</td></tr>').join("")+'</table></div>';}
+function appointmentTable(items){if(!items.length)return '<div class="muted">Randevu bulunmuyor.</div>';return '<div class="scroll"><table><tr><th>Müşteri</th><th>Saat</th><th>Hizmet</th><th>Durum</th><th>İşlem</th></tr>'+items.map(x=>'<tr><td>'+escapeHtml(x.customer_name)+'</td><td>'+escapeHtml(x.time)+'</td><td>'+escapeHtml(x.service)+'</td><td>'+badge(x.status)+'</td><td>'+actionButtons(x)+'</td></tr>').join("")+"</table></div>";}
 async function loadDashboard(){
  const [ar,mr]=await Promise.all([fetch("/api/appointments"),fetch("/api/messages")]);const items=await ar.json(),messages=await mr.json();
  const todayItems=items.filter(x=>x.date===today),pending=items.filter(x=>x.status==="pending"),confirmed=items.filter(x=>x.status==="confirmed"),unique=[...new Map(items.filter(x=>x.phone).map(x=>[x.phone,x])).values()];
  document.getElementById("todayCount").textContent=todayItems.length;document.getElementById("pendingCount").textContent=pending.length;document.getElementById("confirmedCount").textContent=confirmed.length;document.getElementById("customerCount").textContent=unique.length;
  document.getElementById("todayAppointments").innerHTML=appointmentTable(todayItems);document.getElementById("pendingAppointments").innerHTML=appointmentTable(pending);
- document.getElementById("customers").innerHTML=unique.length?'<div class="scroll"><table><tr><th>Müşteri</th><th>Telefon</th><th>Son randevu</th><th>Hizmet</th></tr>'+unique.map(x=>'<tr><td>'+escapeHtml(x.customer_name)+'</td><td>'+escapeHtml(x.phone)+'</td><td>'+escapeHtml(x.date)+' '+escapeHtml(x.time)+'</td><td>'+escapeHtml(x.service)+'</td></tr>').join("")+'</table></div>':'<div class="muted">Henüz müşteri yok.</div>';
- document.getElementById("messages").innerHTML=messages.length?'<div class="scroll"><table><tr><th>Kanal</th><th>Müşteri</th><th>Mesaj</th><th>AI Niyeti</th><th>Zaman</th></tr>'+messages.slice().reverse().map(x=>'<tr><td class="channel">'+escapeHtml(x.channel)+'</td><td class="'+(x.customer_name?"unread":"")+'">'+escapeHtml(x.customer_name||"Bilinmiyor")+(x.phone?'<span class="pill">'+escapeHtml(x.phone)+'</span>':"")+'</td><td class="message">'+escapeHtml(x.message)+'</td><td>'+escapeHtml(x.intent||"other")+'</td><td>'+escapeHtml(x.created_at)+'</td></tr>').join("")+'</table></div>':'<div class="muted">Henüz müşteri mesajı yok.</div>';
+ document.getElementById("customers").innerHTML=unique.length?'<div class="scroll"><table><tr><th>Müşteri</th><th>Telefon</th><th>Son randevu</th><th>Hizmet</th></tr>'+unique.map(x=>'<tr><td>'+escapeHtml(x.customer_name)+'</td><td>'+escapeHtml(x.phone)+'</td><td>'+escapeHtml(x.date)+' '+escapeHtml(x.time)+'</td><td>'+escapeHtml(x.service)+'</td></tr>').join("")+"</table></div>":"<div class="muted">Henüz müşteri yok.</div>";
+ document.getElementById("messages").innerHTML=messages.length?'<div class="scroll"><table><tr><th>Kanal</th><th>Müşteri</th><th>Mesaj</th><th>AI Niyeti</th><th>Zaman</th></tr>'+messages.slice().reverse().map(x=>'<tr><td class="channel">'+escapeHtml(x.channel)+'</td><td class="'+(x.customer_name?"unread":"")+'">'+escapeHtml(x.customer_name||"Bilinmiyor")+(x.phone?'<span class="pill">'+escapeHtml(x.phone)+"</span>":"")+"</td><td class="message">"+escapeHtml(x.message)+"</td><td>"+escapeHtml(x.intent||"other")+"</td><td>"+escapeHtml(x.created_at)+"</td></tr>").join("")+"</table></div>":"<div class="muted">Henüz müşteri mesajı yok.</div>";
 }
 fetch("/api/business").then(r=>r.json()).then(b=>document.getElementById("business").textContent=b.business_name+" • "+b.sector+" • "+b.working_hours).catch(()=>{});
 document.getElementById("chatForm").addEventListener("submit",async e=>{e.preventDefault();const input=document.getElementById("message"),m=input.value.trim();if(!m)return;const d=document.createElement("div");d.className="msg user";d.textContent=m;document.getElementById("chat").appendChild(d);input.value="";const bot=document.createElement("div");bot.className="msg bot";bot.textContent="Yanıt hazırlanıyor...";document.getElementById("chat").appendChild(bot);try{const r=await fetch("/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message:m})});const x=await r.json();bot.textContent=x.reply||x.error||"Yanıt alınamadı.";loadDashboard();}catch(err){bot.textContent="Sunucuya bağlanılamadı.";}});
 
 document.getElementById("appointmentForm").addEventListener("submit",async e=>{e.preventDefault();const data={customer_name:document.getElementById("customer_name").value,phone:document.getElementById("phone").value,date:document.getElementById("date").value,time:document.getElementById("time").value,service:document.getElementById("service").value};const r=await fetch("/api/appointments",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(data)});if(r.ok){e.target.reset();loadDashboard();alert("Randevu kaydedildi.");}else{const x=await r.json();alert(x.error||"Randevu kaydedilemedi.");}});
 let deferredPrompt;window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferredPrompt=e;document.getElementById("installBtn").hidden=false;});document.getElementById("installBtn").addEventListener("click",async()=>{if(!deferredPrompt)return;deferredPrompt.prompt();await deferredPrompt.userChoice;deferredPrompt=null;document.getElementById("installBtn").hidden=true;});if("serviceWorker" in navigator)navigator.serviceWorker.register("./service-worker.js").catch(()=>{});
+loadDashboard();
 </script></body></html>
