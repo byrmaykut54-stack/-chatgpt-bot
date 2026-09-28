@@ -17,6 +17,8 @@ CREATE TABLE IF NOT EXISTS businesses (
     plan TEXT NOT NULL DEFAULT 'trial',
     status TEXT NOT NULL DEFAULT 'active',
     trial_ends_at TIMESTAMPTZ,
+    whatsapp_phone_number_id TEXT NOT NULL DEFAULT '',
+    whatsapp_access_token TEXT NOT NULL DEFAULT '',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -134,6 +136,8 @@ def ensure_schema():
         conn.execute("ALTER TABLE businesses ADD COLUMN IF NOT EXISTS plan TEXT NOT NULL DEFAULT 'trial'")
         conn.execute("ALTER TABLE businesses ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active'")
         conn.execute("ALTER TABLE businesses ADD COLUMN IF NOT EXISTS trial_ends_at TIMESTAMPTZ")
+        conn.execute("ALTER TABLE businesses ADD COLUMN IF NOT EXISTS whatsapp_phone_number_id TEXT NOT NULL DEFAULT ''")
+        conn.execute("ALTER TABLE businesses ADD COLUMN IF NOT EXISTS whatsapp_access_token TEXT NOT NULL DEFAULT ''")
         conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS permissions JSONB NOT NULL DEFAULT '{}'::jsonb")
         conn.execute("ALTER TABLE sessions ALTER COLUMN expires_at DROP NOT NULL")
         conn.execute("ALTER TABLE sessions ADD COLUMN IF NOT EXISTS revoked_at TIMESTAMPTZ")
@@ -279,6 +283,33 @@ def get_business_config(business_id):
     with connection() as conn:
         row = conn.execute("SELECT config FROM businesses WHERE id=%s", (business_id,)).fetchone()
         return row[0] if row else {}
+
+def get_business_whatsapp(business_id):
+    with connection() as conn:
+        row = conn.execute(
+            "SELECT whatsapp_phone_number_id, whatsapp_access_token FROM businesses WHERE id=%s",
+            (business_id,)
+        ).fetchone()
+        return {"phone_number_id": row[0], "access_token": row[1]} if row else {"phone_number_id":"", "access_token":""}
+
+def update_business_whatsapp(business_id, phone_number_id=None, access_token=None):
+    current = get_business_whatsapp(business_id)
+    phone_number_id = current["phone_number_id"] if phone_number_id is None else str(phone_number_id).strip()
+    access_token = current["access_token"] if access_token is None else str(access_token).strip()
+    with connection() as conn:
+        conn.execute(
+            "UPDATE businesses SET whatsapp_phone_number_id=%s, whatsapp_access_token=%s WHERE id=%s",
+            (phone_number_id, access_token, business_id)
+        )
+        conn.commit()
+
+def find_business_by_whatsapp_phone_number_id(phone_number_id):
+    with connection() as conn:
+        row = conn.execute(
+            "SELECT id FROM businesses WHERE whatsapp_phone_number_id=%s LIMIT 1",
+            (str(phone_number_id).strip(),)
+        ).fetchone()
+        return row[0] if row else None
 
 def update_business(business_id, name, config):
     with connection() as conn:
