@@ -481,6 +481,19 @@ class Handler(BaseHTTPRequestHandler):
             if not user_can(user,"messages"):
                 self.send_json(403,{"error":"Mesajlara erişim yetkiniz yok."}); return
             self.send_json(200, load_messages(user)); return
+        if parsed.path == "/api/customers":
+            user=auth_required(self)
+            if not user: return
+            if not user_can(user,"customers"):
+                self.send_json(403,{"error":"Müşterilere erişim yetkiniz yok."}); return
+            rows=database.list_customers_by_business(user[1])
+            self.send_json(200,[{"id":r[0],"name":r[1],"phone":r[2],"created_at":r[3].isoformat() if hasattr(r[3],"isoformat") else str(r[3]),"updated_at":r[4].isoformat() if hasattr(r[4],"isoformat") else str(r[4])} for r in rows]); return
+        if parsed.path == "/api/reports":
+            user=auth_required(self)
+            if not user: return
+            if not user_can(user,"reports"):
+                self.send_json(403,{"error":"Raporlara erişim yetkiniz yok."}); return
+            self.send_json(200,database.get_business_report(user[1])); return
         if parsed.path == "/api/users":
             user=auth_required(self)
             if not user: return
@@ -575,6 +588,8 @@ class Handler(BaseHTTPRequestHandler):
             if self.path in ("/chat", "/webhook/message"):
                 user=auth_required(self)
                 if not user: return
+                if not user_can(user,"messages"):
+                    self.send_json(403,{"error":"AI müşteri asistanına erişim yetkiniz yok."}); return
                 message = str(data.get("message", "")).strip()
                 if not message:
                     self.send_json(400, {"error": "message alanı gerekli"}); return
@@ -591,8 +606,8 @@ class Handler(BaseHTTPRequestHandler):
                 role=str(data.get("role","staff")).strip()
                 if not email or "@" not in email or len(password) < 8:
                     self.send_json(400,{"error":"Geçerli e-posta ve en az 8 karakterli şifre gerekli."}); return
-                if role not in {"staff","owner"}:
-                    self.send_json(400,{"error":"Geçersiz rol."}); return
+                if role != "staff":
+                    self.send_json(400,{"error":"Yeni çalışan hesapları staff rolüyle oluşturulabilir."}); return
                 if database.get_user_by_email(email):
                     self.send_json(409,{"error":"Bu e-posta zaten kayıtlı."}); return
                 uid=database.create_user(email,hash_password(password),user[1],role)
@@ -623,8 +638,15 @@ class Handler(BaseHTTPRequestHandler):
                 target=int(data.get("user_id",0)); role=str(data.get("role","staff")).strip()
                 if role not in {"owner","staff"}:
                     self.send_json(400,{"error":"Geçersiz rol."}); return
+                if target == user[0]:
+                    self.send_json(400,{"error":"Kendi rolünüzü bu ekrandan değiştiremezsiniz."}); return
+                target_user=database.get_user_in_business(user[1],target)
+                if not target_user:
+                    self.send_json(404,{"error":"Kullanıcı bulunamadı."}); return
+                if target_user[2] == "owner" and role == "staff" and database.count_owners(user[1]) <= 1:
+                    self.send_json(400,{"error":"İşletmede en az bir owner kalmalıdır."}); return
                 database.update_user_role(user[1],target,role)
-                self.send_json(200,{"success":True}); return
+                self.send_json(200,{"success":True,"role":role}); return
 
             if self.path == "/api/business":
                 user=auth_required(self)
