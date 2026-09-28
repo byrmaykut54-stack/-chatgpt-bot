@@ -65,6 +65,7 @@ CREATE TABLE IF NOT EXISTS users (
     email TEXT NOT NULL,
     password_hash TEXT NOT NULL,
     role TEXT NOT NULL DEFAULT 'owner',
+    permissions JSONB NOT NULL DEFAULT '{}'::jsonb,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE (email)
 );
@@ -281,3 +282,17 @@ def update_user_role(business_id,user_id,role):
     with connection() as conn:
         conn.execute("UPDATE users SET role=%s WHERE id=%s AND business_id=%s",(role,user_id,business_id))
         conn.commit()
+
+
+def get_user_permissions(user_id):
+    with connection() as conn:
+        row=conn.execute("SELECT role, permissions FROM users WHERE id=%s",(user_id,)).fetchone()
+        if not row: return None
+        if row[0]=='owner': return {'appointments':True,'customers':True,'messages':True,'business_settings':True,'team':True,'reports':True}
+        return row[1] or {}
+
+def update_user_permissions(business_id,user_id,permissions):
+    with connection() as conn:
+        row=conn.execute("UPDATE users SET permissions=%s WHERE id=%s AND business_id=%s RETURNING id",(psycopg.types.json.Json(permissions),user_id,business_id)).fetchone()
+        conn.commit()
+        return bool(row)
