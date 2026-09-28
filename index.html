@@ -35,7 +35,7 @@ input{width:100%;padding:11px;border:1px solid #dfe4e8;border-radius:9px;margin:
 <button id="setupBtn" class="full" style="margin-top:8px;background:#eef2f5;display:none">İlk İşletme Hesabını Oluştur</button>
 <div id="authError" style="color:#9b2420;margin-top:12px;font-size:14px"></div>
 </div></div><div id="app" class="wrap" style="display:none">
-<div class="top"><div><h1>🤖 AI İşletme Asistanı</h1><div id="business" class="muted">İşletme bilgileri yükleniyor...</div></div><div><div class="muted" id="todayLabel"></div><button id="installBtn" class="install" hidden>📲 Uygulamayı Yükle</button></div></div>
+<div class="top"><div><h1>🤖 AI İşletme Asistanı</h1><div id="business" class="muted">İşletme bilgileri yükleniyor...</div></div><div><div class="muted" id="todayLabel"></div><button id="notifyBtn" class="install" style="margin-right:6px">🔔 Bildirimleri Aç</button><button id="installBtn" class="install" hidden>📲 Uygulamayı Yükle</button></div></div>
 <div class="grid">
 <div class="card"><div class="label">BUGÜNÜN RANDEVULARI</div><div class="stat" id="todayCount">0</div></div>
 <div class="card"><div class="label">BEKLEYEN</div><div class="stat" id="pendingCount">0</div></div>
@@ -74,6 +74,7 @@ function actionButtons(x){return x.status==="pending"?'<button class="approve" o
 function appointmentTable(items){if(!items.length)return '<div class="muted">Randevu bulunmuyor.</div>';return '<div class="scroll"><table><tr><th>Müşteri</th><th>Saat</th><th>Hizmet</th><th>Durum</th><th>İşlem</th></tr>'+items.map(x=>'<tr><td>'+escapeHtml(x.customer_name)+'</td><td>'+escapeHtml(x.time)+'</td><td>'+escapeHtml(x.service)+'</td><td>'+badge(x.status)+'</td><td>'+actionButtons(x)+'</td></tr>').join("")+"</table></div>";}
 async function loadDashboard(){
  const [ar,mr]=await Promise.all([fetch("/api/appointments"),fetch("/api/messages")]);const items=await ar.json(),messages=await mr.json();
+ checkAppointmentNotifications(items); checkUpcomingReminders(items);
  const todayItems=items.filter(x=>x.date===today),pending=items.filter(x=>x.status==="pending"),confirmed=items.filter(x=>x.status==="confirmed"),unique=[...new Map(items.filter(x=>x.phone).map(x=>[x.phone,x])).values()];
  document.getElementById("todayCount").textContent=todayItems.length;document.getElementById("pendingCount").textContent=pending.length;document.getElementById("confirmedCount").textContent=confirmed.length;document.getElementById("customerCount").textContent=unique.length;
  document.getElementById("todayAppointments").innerHTML=appointmentTable(todayItems);document.getElementById("pendingAppointments").innerHTML=appointmentTable(pending);
@@ -83,7 +84,8 @@ async function loadDashboard(){
 fetch("/api/business").then(r=>r.json()).then(b=>document.getElementById("business").textContent=b.business_name+" • "+b.sector+" • "+b.working_hours).catch(()=>{});
 document.getElementById("chatForm").addEventListener("submit",async e=>{e.preventDefault();const input=document.getElementById("message"),m=input.value.trim();if(!m)return;const d=document.createElement("div");d.className="msg user";d.textContent=m;document.getElementById("chat").appendChild(d);input.value="";const bot=document.createElement("div");bot.className="msg bot";bot.textContent="Yanıt hazırlanıyor...";document.getElementById("chat").appendChild(bot);try{const r=await fetch("/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message:m})});const x=await r.json();bot.textContent=x.reply||x.error||"Yanıt alınamadı.";loadDashboard();}catch(err){bot.textContent="Sunucuya bağlanılamadı.";}});
 
-document.getElementById("appointmentForm").addEventListener("submit",async e=>{e.preventDefault();const data={customer_name:document.getElementById("customer_name").value,phone:document.getElementById("phone").value,date:document.getElementById("date").value,time:document.getElementById("time").value,service:document.getElementById("service").value};const r=await fetch("/api/appointments",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(data)});if(r.ok){e.target.reset();loadDashboard();alert("Randevu kaydedildi.");}else{const x=await r.json();alert(x.error||"Randevu kaydedilemedi.");}});
+document.getElementById("notifyBtn").addEventListener("click",enableNotifications);
+document.getElementById("appointmentForm").addEventListener("submit",async e=>{e.preventDefault();const data={customer_name:document.getElementById("customer_name").value,phone:document.getElementById("phone").value,date:document.getElementById("date").value,time:document.getElementById("time").value,service:document.getElementById("service").value};const r=await fetch("/api/appointments",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(data)});if(r.ok){const x=await r.json().catch(()=>null);e.target.reset();loadDashboard();if(x&&x.appointment)appointmentNotification(x.appointment,"Yeni randevu");alert("Randevu kaydedildi.");}else{const x=await r.json();alert(x.error||"Randevu kaydedilemedi.");}});
 let deferredPrompt;window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferredPrompt=e;document.getElementById("installBtn").hidden=false;});document.getElementById("installBtn").addEventListener("click",async()=>{if(!deferredPrompt)return;deferredPrompt.prompt();await deferredPrompt.userChoice;deferredPrompt=null;document.getElementById("installBtn").hidden=true;});if("serviceWorker" in navigator)navigator.serviceWorker.register("./service-worker.js").catch(()=>{});
 async function authInit(){
   const status=await fetch("/api/auth/status").then(r=>r.json()).catch(()=>({authenticated:false}));
@@ -104,6 +106,7 @@ async function authInit(){
   });
 }
 authInit();
+setInterval(()=>{if(document.getElementById("app").style.display!=="none")loadDashboard();},30000);
 const businessForm=document.getElementById("businessForm");
 async function loadBusinessSettings(){
  const r=await fetch("/api/business"); if(!r.ok)return; const b=await r.json();
