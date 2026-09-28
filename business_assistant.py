@@ -186,6 +186,15 @@ def is_time_available(date, time):
     active = {"pending", "confirmed"}
     return not any(item.get("date") == date and item.get("time") == time and item.get("status") in active for item in items)
 
+def get_free_slots(date, config):
+    hours = str(config.get("working_hours", "09:00-19:00"))
+    match = re.search(r"(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})", hours)
+    if not match:
+        return []
+    start = int(match.group(1))
+    end = int(match.group(3))
+    return [f"{hour:02d}:00" for hour in range(start, end) if is_time_available(date, f"{hour:02d}:00")]
+
 def handle_customer_message(message, channel="web", customer_name="", phone=""):
     config = load_config()
     hint = local_intent_hint(message, config)
@@ -211,9 +220,12 @@ def handle_customer_message(message, channel="web", customer_name="", phone=""):
         date = intent.get("date", "")
         time = intent.get("time", "")
         if not date:
-            return {"reply": "Boş saatleri kontrol edebilmem için hangi tarih için baktığınızı yazar mısınız?"}
+            date = datetime.now().strftime("%Y-%m-%d")
         if not time:
-            return {"reply": f"{date} için randevu saatlerini kontrol edebilirim. Hangi saat aralığına bakmamı istersiniz?"}
+            slots = get_free_slots(date, config)
+            if slots:
+                return {"reply": f"Bugün ({date}) boş saatler: " + ", ".join(slots) + "."}
+            return {"reply": f"Bugün ({date}) için uygun boş saat görünmüyor."}
         available = is_time_available(date, time)
         if available:
             return {"reply": f"Evet, {date} günü saat {time} şu an boş görünüyor."}
