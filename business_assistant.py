@@ -501,6 +501,17 @@ class Handler(BaseHTTPRequestHandler):
                 result = handle_customer_message(message, str(data.get("channel", "web")).strip() or "web", str(data.get("customer_name", "")).strip(), str(data.get("phone", "")).strip(), user)
                 self.send_json(200, result); return
 
+            if self.path == "/api/users/role":
+                user=auth_required(self)
+                if not user: return
+                if user[3] != "owner":
+                    self.send_json(403,{"error":"Sadece işletme sahibi yetki değiştirebilir."}); return
+                target=int(data.get("user_id",0)); role=str(data.get("role","staff")).strip()
+                if role not in {"owner","staff"}:
+                    self.send_json(400,{"error":"Geçersiz rol."}); return
+                database.update_user_role(user[1],target,role)
+                self.send_json(200,{"success":True}); return
+
             if self.path == "/api/business":
                 user=auth_required(self)
                 if not user: return
