@@ -73,6 +73,7 @@ CREATE TABLE IF NOT EXISTS users (
     role TEXT NOT NULL DEFAULT 'owner',
     permissions JSONB NOT NULL DEFAULT '{}'::jsonb,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    email_verified_at TIMESTAMPTZ,
     UNIQUE (email)
 );
 
@@ -116,6 +117,15 @@ CREATE TABLE IF NOT EXISTS sessions (
 );
 
 CREATE INDEX IF NOT EXISTS sessions_expires_idx ON sessions (expires_at);
+
+CREATE TABLE IF NOT EXISTS password_reset_tokens (
+ token_hash TEXT PRIMARY KEY, user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ expires_at TIMESTAMPTZ NOT NULL, used_at TIMESTAMPTZ, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS email_verification_tokens (
+ token_hash TEXT PRIMARY KEY, user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ expires_at TIMESTAMPTZ NOT NULL, used_at TIMESTAMPTZ, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 """
 
 @contextmanager
@@ -139,6 +149,7 @@ def ensure_schema():
         conn.execute("ALTER TABLE businesses ADD COLUMN IF NOT EXISTS whatsapp_phone_number_id TEXT NOT NULL DEFAULT ''")
         conn.execute("ALTER TABLE businesses ADD COLUMN IF NOT EXISTS whatsapp_access_token TEXT NOT NULL DEFAULT ''")
         conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS permissions JSONB NOT NULL DEFAULT '{}'::jsonb")
+        conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified_at TIMESTAMPTZ")
         conn.execute("ALTER TABLE sessions ALTER COLUMN expires_at DROP NOT NULL")
         conn.execute("ALTER TABLE sessions ADD COLUMN IF NOT EXISTS revoked_at TIMESTAMPTZ")
         conn.commit()
@@ -185,6 +196,45 @@ def create_user(email, password_hash, business_id, role="owner"):
         row = conn.execute("INSERT INTO users (business_id,email,password_hash,role,permissions) VALUES (%s,%s,%s,%s,%s) RETURNING id", (business_id, email.strip().lower(), password_hash, role, psycopg.types.json.Json({"appointments":True,"customers":True,"messages":True,"business_settings":role=="owner","team":role=="owner","reports":True}))).fetchone()
         conn.commit()
         return row[0]
+
+def create_password_reset_token(token_hash, user_id, expires_at):
+    with connection() as conn:
+        conn.execute("DELETE FROM password_reset_tokens WHERE user_id=%s OR expires_at<NOW()", (user_id,))
+        conn.execute("INSERT INTO password_reset_tokens (token_hash,user_id,expires_at) VALUES (%s,%s,%s)", (token_hash,user_id,expires_at))
+        conn.commit()
+
+def consume_password_reset_token(token_hash):
+    with connection() as conn:
+        row=conn.execute("SELECT user_id FROM password_reset_tokens WHERE token_hash=%s AND used_at IS NULL AND expires_at>NOW()", (token_hash,)).fetchone()
+        if not row: return None
+        conn.execute("UPDATE password_reset_tokens SET used_at=NOW() WHERE token_hash=%s", (token_hash,))
+        conn.commit()
+        return row[0]
+
+def set_user_password(user_id, password_hash):
+    with connection() as conn:
+        conn.execute("UPDATE users SET password_hash=%s WHERE id=%s", (password_hash,user_id))
+        conn.execute("UPDATE sessions SET revoked_at=NOW() WHERE user_id=%s AND revoked_at IS NULL", (user_id,))
+        conn.commit()
+
+def create_email_verification_token(token_hash, user_id, expires_at):
+    with connection() as conn:
+        conn.execute("DELETE FROM email_verification_tokens WHERE user_id=%s OR expires_at<NOW()", (user_id,))
+        conn.execute("INSERT INTO email_verification_tokens (token_hash,user_id,expires_at) VALUES (%s,%s,%s)", (token_hash,user_id,expires_at))
+        conn.commit()
+
+def consume_email_verification_token(token_hash):
+    with connection() as conn:
+        row=conn.execute("SELECT user_id FROM email_verification_tokens WHERE token_hash=%s AND used_at IS NULL AND expires_at>NOW()", (token_hash,)).fetchone()
+        if not row: return None
+        conn.execute("UPDATE email_verification_tokens SET used_at=NOW() WHERE token_hash=%s", (token_hash,))
+        conn.commit()
+        return row[0]
+
+def mark_email_verified(user_id):
+    with connection() as conn:
+        conn.execute("UPDATE users SET email_verified_at=NOW() WHERE id=%s", (user_id,))
+        conn.commit()
 
 def create_session(token_hash, user_id, expires_at):
     with connection() as conn:
