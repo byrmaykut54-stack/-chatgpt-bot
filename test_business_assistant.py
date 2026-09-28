@@ -89,7 +89,7 @@ class BusinessAssistantTests(unittest.TestCase):
         config = {**business_assistant.DEFAULT_CONFIG, "working_hours": "09:00-18:00", "closed_days": []}
         with patch.object(business_assistant, "is_time_available", return_value=True):
             with patch("business_assistant.datetime") as dt:
-                dt.now.return_value = type("D", (), {"hour": 14, "minute": 30})()
+                dt.now.return_value = type("D", (), {"hour": 14, "minute": 30, "strftime": lambda self, fmt: "2026-10-01"})()
                 dt.strptime = __import__("datetime").datetime.strptime
                 slots = business_assistant.get_free_slots("2026-10-01", config)
         self.assertNotIn("14:00", slots)
