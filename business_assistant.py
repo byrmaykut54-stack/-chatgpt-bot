@@ -395,7 +395,7 @@ def whatsapp_verify(query):
 def verify_whatsapp_signature(raw_body, signature):
     secret = os.environ.get("META_APP_SECRET", "").strip()
     if not secret:
-        return True
+        return False
     if not signature or not signature.startswith("sha256="):
         return False
     expected = "sha256=" + hmac.new(secret.encode("utf-8"), raw_body, hashlib.sha256).hexdigest()
@@ -425,7 +425,6 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
-        self.send_header("Access-Control-Allow-Origin", "*")
         self.end_headers()
         self.wfile.write(body)
 
