@@ -328,7 +328,7 @@ def handle_customer_message(message, channel="web", customer_name="", phone="", 
             if slots:
                 return {"reply": f"Bugün ({date}) boş saatler: " + ", ".join(slots) + "."}
             return {"reply": f"Bugün ({date}) için uygun boş saat görünmüyor."}
-        available = is_time_available(date, time, config)
+        available = is_time_available(date, time, config, user)
         if available:
             return {"reply": f"Evet, {date} günü saat {time} şu an boş görünüyor."}
         return {"reply": f"Maalesef {date} günü saat {time} uygun değil. Çalışma saatleri 09:00-18:00, Pazar günleri tatil."}
@@ -341,7 +341,7 @@ def handle_customer_message(message, channel="web", customer_name="", phone="", 
         if not missing:
             if is_closed_day(intent["date"], config):
                 return {"reply": "Pazar günü işletme kapalı. Lütfen başka bir gün seçer misiniz?"}
-            if not is_time_available(intent["date"], intent["time"], config):
+            if not is_time_available(intent["date"], intent["time"], config, user):
                 return {"reply": "Seçtiğiniz tarih veya saat uygun değil. Çalışma saatleri 09:00-18:00, Pazar günleri tatil."}
             appointment, error = create_appointment(intent, user)
             if appointment:
@@ -455,11 +455,11 @@ class Handler(BaseHTTPRequestHandler):
         if parsed.path == "/api/appointments":
             user=auth_required(self)
             if not user: return
-            self.send_json(200, load_appointments()); return
+            self.send_json(200, load_appointments(user)); return
         if parsed.path == "/api/messages":
             user=auth_required(self)
             if not user: return
-            self.send_json(200, load_messages()); return
+            self.send_json(200, load_messages(user)); return
         if parsed.path == "/health":
             self.send_json(200, {"status": "ok", "service": "AI İşletme Asistanı"}); return
         self.send_json(404, {"error": "Not found"})
@@ -487,9 +487,9 @@ class Handler(BaseHTTPRequestHandler):
                 if not ok:
                     out["reply_error"] = send_result
                 else:
-                    messages = load_messages(user)
+                    messages = load_messages()
                     messages.append({"id": datetime.utcnow().strftime("%Y%m%d%H%M%S%f"), "message_id": incoming.get("message_id", ""), "channel": "whatsapp", "direction": "outbound", "customer_name": incoming["customer_name"], "phone": incoming["phone"], "message": result["reply"], "intent": "ai_reply", "created_at": datetime.utcnow().isoformat() + "Z"})
-                    save_messages(messages, user)
+                    save_messages(messages)
                 self.send_json(200, out); return
 
             if self.path in ("/chat", "/webhook/message"):
