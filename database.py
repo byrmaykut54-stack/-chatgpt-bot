@@ -97,6 +97,15 @@ def ensure_schema():
         conn.execute(SCHEMA)
         conn.commit()
 
+def create_business(name, config):
+    with connection() as conn:
+        row = conn.execute(
+            "INSERT INTO businesses (name, config) VALUES (%s, %s) RETURNING id",
+            (name, psycopg.types.json.Json(config))
+        ).fetchone()
+        conn.commit()
+        return row[0]
+
 def get_business_id(config):
     ensure_schema()
     with connection() as conn:
