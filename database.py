@@ -146,6 +146,15 @@ CREATE TABLE IF NOT EXISTS appointment_reminders (
     sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     PRIMARY KEY (appointment_id, channel)
 );
+
+CREATE TABLE IF NOT EXISTS usage_counters (
+    business_id BIGINT NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
+    period_start DATE NOT NULL,
+    metric TEXT NOT NULL,
+    used_count BIGINT NOT NULL DEFAULT 0,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (business_id, period_start, metric)
+);
 """
 
 @contextmanager
@@ -591,6 +600,33 @@ def update_user_permissions(business_id,user_id,permissions):
         conn.commit()
         return bool(row)
 
+def get_usage(business_id, metric, period_start=None):
+    period_start = period_start or datetime.now(timezone.utc).date().replace(day=1)
+    with connection() as conn:
+        row=conn.execute(
+            "SELECT used_count FROM usage_counters WHERE business_id=%s AND period_start=%s AND metric=%s",
+            (business_id,period_start,metric)
+        ).fetchone()
+    return int(row[0]) if row else 0
+
+def increment_usage(business_id, metric, amount=1):
+    period_start=datetime.now(timezone.utc).date().replace(day=1)
+    with connection() as conn:
+        row=conn.execute(
+            "INSERT INTO usage_counters (business_id,period_start,metric,used_count) VALUES (%s,%s,%s,%s) "
+            "ON CONFLICT (business_id,period_start,metric) DO UPDATE SET used_count=usage_counters.used_count+EXCLUDED.used_count,updated_at=NOW() "
+            "RETURNING used_count",
+            (business_id,period_start,metric,amount)
+        ).fetchone()
+        conn.commit()
+    return int(row[0])
+
+def get_usage_summary(business_id):
+    return {
+        "appointments": get_usage(business_id,"appointments"),
+        "ai_messages": get_usage(business_id,"ai_messages")
+    }
+
 def get_business_subscription(business_id):
     with connection() as conn:
         row = conn.execute(
@@ -618,67 +654,3 @@ def get_subscription_record(business_id):
         "current_period_end": row[7].isoformat() if row[7] else None,
         "cancel_at_period_end": bool(row[8])
     }
-
-def create_or_update_subscription(business_id, provider, provider_customer_id, provider_subscription_id, status="active", period_start=None, period_end=None, cancel_at_period_end=False):
-    with connection() as conn:
-        row = conn.execute("""
-            INSERT INTO subscriptions
-            (business_id,provider,provider_customer_id,provider_subscription_id,plan,status,current_period_start,current_period_end,cancel_at_period_end,updated_at)
-            VALUES (%s,%s,%s,%s,'pro',%s,%s,%s,%s,NOW())
-            ON CONFLICT (business_id) DO UPDATE SET
-              provider=EXCLUDED.provider,
-              provider_customer_id=EXCLUDED.provider_customer_id,
-              provider_subscription_id=EXCLUDED.provider_subscription_id,
-              plan='pro',
-              status=EXCLUDED.status,
-              current_period_start=EXCLUDED.current_period_start,
-              current_period_end=EXCLUDED.current_period_end,
-              cancel_at_period_end=EXCLUDED.cancel_at_period_end,
-              updated_at=NOW()
-            RETURNING id
-        """, (business_id,provider,provider_customer_id,provider_subscription_id,status,period_start,period_end,cancel_at_period_end)).fetchone()
-        conn.execute("UPDATE businesses SET plan='pro', status='active' WHERE id=%s", (business_id,))
-        conn.commit()
-        return row[0] if row else None
-
-def update_subscription_status(business_id, status, cancel_at_period_end=None, period_end=None):
-    with connection() as conn:
-        if cancel_at_period_end is None:
-            conn.execute("UPDATE subscriptions SET status=%s, current_period_end=COALESCE(%s,current_period_end), updated_at=NOW() WHERE business_id=%s", (status,period_end,business_id))
-        else:
-            conn.execute("UPDATE subscriptions SET status=%s, cancel_at_period_end=%s, current_period_end=COALESCE(%s,current_period_end), updated_at=NOW() WHERE business_id=%s", (status,cancel_at_period_end,period_end,business_id))
-        if status in {"active","trialing"}:
-            conn.execute("UPDATE businesses SET plan='pro', status='active' WHERE id=%s", (business_id,))
-        elif status in {"cancelled","canceled","inactive"}:
-            if cancel_at_period_end and period_end:
-                conn.execute("UPDATE businesses SET plan='pro', status='active' WHERE id=%s", (business_id,))
-            else:
-                conn.execute("UPDATE businesses SET plan='trial', status='active', trial_ends_at=LEAST(COALESCE(trial_ends_at,NOW()), NOW()) WHERE id=%s", (business_id,))
-        elif status in {"past_due","unpaid"}:
-            # Keep Pro during provider retry/grace handling; the provider webhook can
-            # explicitly downgrade when the subscription is actually cancelled.
-            conn.execute("UPDATE businesses SET plan='pro', status='active' WHERE id=%s", (business_id,))
-        conn.commit()
-
-def get_business_by_provider_subscription(provider_subscription_id):
-    with connection() as conn:
-        row=conn.execute("SELECT business_id FROM subscriptions WHERE provider_subscription_id=%s",(provider_subscription_id,)).fetchone()
-    return row[0] if row else None
-
-
-def create_billing_checkout_session(business_id, provider, checkout_token, conversation_id):
-    with connection() as conn:
-        row=conn.execute("INSERT INTO billing_checkout_sessions (business_id,provider,checkout_token,conversation_id) VALUES (%s,%s,%s,%s) RETURNING id",(business_id,provider,checkout_token,conversation_id)).fetchone()
-        conn.commit()
-    return row[0]
-
-def get_billing_checkout_session(checkout_token):
-    with connection() as conn:
-        row=conn.execute("SELECT id,business_id,provider,checkout_token,conversation_id,completed_at FROM billing_checkout_sessions WHERE checkout_token=%s",(checkout_token,)).fetchone()
-    return row
-
-def complete_billing_checkout(checkout_token):
-    with connection() as conn:
-        conn.execute("UPDATE billing_checkout_sessions SET completed_at=NOW() WHERE checkout_token=%s",(checkout_token,))
-        conn.commit()
-
