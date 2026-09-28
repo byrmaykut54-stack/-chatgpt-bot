@@ -503,10 +503,10 @@ class Handler(BaseHTTPRequestHandler):
                 business_id=database.create_business(business_name,config)
                 user_id=database.create_user(email,hash_password(password),business_id,"owner")
                 token=os.urandom(32).hex()
-                expires=(datetime.now(timezone.utc)+timedelta(days=30)).isoformat()
+                expires=None
                 database.create_session(hashlib.sha256(token.encode("utf-8")).hexdigest(),user_id,expires)
                 self.send_response(201)
-                self.send_header("Set-Cookie","session="+token+"; HttpOnly; SameSite=Lax; Path=/; Max-Age=2592000")
+                self.send_header("Set-Cookie","session="+token+"; HttpOnly; SameSite=Lax; Path=/; Expires=Fri, 31 Dec 2099 23:59:59 GMT")
                 self.send_header("Content-Type","application/json; charset=utf-8")
                 body=json.dumps({"success":True,"email":email},ensure_ascii=False).encode("utf-8")
                 self.send_header("Content-Length",str(len(body))); self.end_headers(); self.wfile.write(body); return
