@@ -464,10 +464,14 @@ class Handler(BaseHTTPRequestHandler):
         if parsed.path == "/api/appointments":
             user=auth_required(self)
             if not user: return
+            if not user_can(user,"appointments"):
+                self.send_json(403,{"error":"Randevulara erişim yetkiniz yok."}); return
             self.send_json(200, load_appointments(user)); return
         if parsed.path == "/api/messages":
             user=auth_required(self)
             if not user: return
+            if not user_can(user,"messages"):
+                self.send_json(403,{"error":"Mesajlara erişim yetkiniz yok."}); return
             self.send_json(200, load_messages(user)); return
         if parsed.path == "/health":
             self.send_json(200, {"status": "ok", "service": "AI İşletme Asistanı"}); return
