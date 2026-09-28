@@ -1,4 +1,4 @@
-const CACHE_NAME = "ai-isletme-asistani-v2";
+const CACHE_NAME = "ai-isletme-asistani-v3";
 const APP_SHELL = ["./", "./index.html", "./manifest.webmanifest", "./app-icon.svg"];
 
 self.addEventListener("install", event => {
@@ -13,6 +13,14 @@ self.addEventListener("activate", event => {
     )
   );
   self.clients.claim();
+});
+
+self.addEventListener("notificationclick", event => {
+  event.notification.close();
+  event.waitUntil(clients.matchAll({type:"window",includeUncontrolled:true}).then(list => {
+    for(const client of list){ if("focus" in client) return client.focus(); }
+    if(clients.openWindow) return clients.openWindow("./");
+  }));
 });
 
 self.addEventListener("fetch", event => {
