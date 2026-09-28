@@ -20,7 +20,8 @@ DEFAULT_CONFIG = {
         {"name": "Saç Kesimi", "price": "500 TL"},
         {"name": "Saç + Sakal", "price": "750 TL"}
     ],
-    "working_hours": "09:00-19:00",
+    "working_hours": "09:00-18:00",
+    "closed_days": ["Pazar"],
     "address": "İşletme adresini config dosyasına yazın",
     "tone": "samimi, kısa ve profesyonel"
 }
@@ -156,7 +157,6 @@ def local_intent_hint(message, config):
                 service = name
                 break
 
-        # "Saat 3 boş mu?" gibi sorularda tarihi açıkça verilmemişse bugün varsayılır.
         today = datetime.now().strftime("%Y-%m-%d") if time_text and any(word in text for word in ("boş", "müsait", "uygun")) else ""
 
         return {
@@ -179,21 +179,45 @@ def local_intent_hint(message, config):
             return {"intent": "price", "service": name, "price": price}
     return None
 
-def is_time_available(date, time):
+def is_closed_day(date, config):
+    try:
+        day_name = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi", "Pazar"][datetime.strptime(date, "%Y-%m-%d").weekday()]
+    except ValueError:
+        return False
+    return day_name in {str(day).strip() for day in config.get("closed_days", [])}
+
+def is_time_available(date, time, config=None):
     if not date or not time:
         return None
+    config = config or load_config()
+    if is_closed_day(date, config):
+        return False
+    hours = str(config.get("working_hours", "09:00-18:00"))
+    match = re.search(r"(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})", hours)
+    if not match:
+        return False
+    start = int(match.group(1)) * 60 + int(match.group(2))
+    end = int(match.group(3)) * 60 + int(match.group(4))
+    try:
+        requested = int(time[:2]) * 60 + int(time[3:5])
+    except (ValueError, TypeError):
+        return False
+    if requested < start or requested >= end:
+        return False
     items = load_appointments()
     active = {"pending", "confirmed"}
     return not any(item.get("date") == date and item.get("time") == time and item.get("status") in active for item in items)
 
 def get_free_slots(date, config):
-    hours = str(config.get("working_hours", "09:00-19:00"))
+    if is_closed_day(date, config):
+        return []
+    hours = str(config.get("working_hours", "09:00-18:00"))
     match = re.search(r"(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})", hours)
     if not match:
         return []
     start = int(match.group(1))
     end = int(match.group(3))
-    return [f"{hour:02d}:00" for hour in range(start, end) if is_time_available(date, f"{hour:02d}:00")]
+    return [f"{hour:02d}:00" for hour in range(start, end) if is_time_available(date, f"{hour:02d}:00", config)]
 
 def handle_customer_message(message, channel="web", customer_name="", phone=""):
     config = load_config()
@@ -221,15 +245,17 @@ def handle_customer_message(message, channel="web", customer_name="", phone=""):
         time = intent.get("time", "")
         if not date:
             date = datetime.now().strftime("%Y-%m-%d")
+        if is_closed_day(date, config):
+            return {"reply": f"{date} günü işletme kapalıdır. Pazar günleri tatildir."}
         if not time:
             slots = get_free_slots(date, config)
             if slots:
                 return {"reply": f"Bugün ({date}) boş saatler: " + ", ".join(slots) + "."}
             return {"reply": f"Bugün ({date}) için uygun boş saat görünmüyor."}
-        available = is_time_available(date, time)
+        available = is_time_available(date, time, config)
         if available:
             return {"reply": f"Evet, {date} günü saat {time} şu an boş görünüyor."}
-        return {"reply": f"Maalesef {date} günü saat {time} dolu görünüyor. Başka bir saat seçebilirsiniz."}
+        return {"reply": f"Maalesef {date} günü saat {time} uygun değil. Çalışma saatleri 09:00-18:00, Pazar günleri tatil."}
 
     if intent.get("intent") == "appointment":
         intent["customer_name"] = record["customer_name"]
@@ -237,6 +263,10 @@ def handle_customer_message(message, channel="web", customer_name="", phone=""):
         required = ["customer_name", "phone", "date", "time", "service"]
         missing = [x for x in required if not str(intent.get(x, "")).strip()]
         if not missing:
+            if is_closed_day(intent["date"], config):
+                return {"reply": "Pazar günü işletme kapalı. Lütfen başka bir gün seçer misiniz?"}
+            if not is_time_available(intent["date"], intent["time"], config):
+                return {"reply": "Seçtiğiniz tarih veya saat uygun değil. Çalışma saatleri 09:00-18:00, Pazar günleri tatil."}
             appointment, error = create_appointment(intent)
             if appointment:
                 return {"reply": f"Randevunuzu aldım. {appointment['date']} {appointment['time']} için {appointment['service']} kaydınız oluşturuldu.", "appointment": appointment}
