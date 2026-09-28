@@ -115,6 +115,15 @@ def initialize_database():
         if not current_messages and legacy_messages:
             database.save_messages(config, legacy_messages)
 
+def require_permission(handler, module):
+    user = auth_required(handler)
+    if not user:
+        return None
+    if not user_can(user, module):
+        handler.send_json(403, {"error": "Bu işlem için yetkiniz yok."})
+        return None
+    return user
+
 def load_appointments(user=None):
     if database_enabled():
         return database.load_appointments_by_business(user[1]) if user else database.load_appointments(load_config())
@@ -426,6 +435,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.end_headers()
+
 
     def do_GET(self):
         parsed = urlparse(self.path)
