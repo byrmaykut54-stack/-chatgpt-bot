@@ -40,12 +40,13 @@ input{width:100%;padding:12px 13px;border:1px solid #e0e5ea;background:#fbfcfd;b
 <div class="auth-divider"><span>veya</span></div><button id="setupBtn" class="full auth-secondary" type="button">Yeni İşletme Hesabı Oluştur</button><div class="auth-foot">Güvenli giriş · Verileriniz işletmenize özel tutulur</div><div class="nexora-corp"><span class="nexora-corp-line"></span><span>NEXORA</span><span class="nexora-corp-dot">•</span><span>İŞLETME YÖNETİM PLATFORMU</span><span class="nexora-corp-line"></span></div><div class="nexora-copyright">© 2026 NEXORA · Tüm hakları saklıdır</div>
 <div id="authError" style="color:#9b2420;margin-top:12px;font-size:14px"></div>
 </div></div><div id="app" class="wrap" style="display:none">
-<div class="top"><div><div style="display:flex;align-items:center;gap:10px"><div class="dash-mark">N</div><div><h1>NEXORA</h1><div id="business" class="muted">İşletme bilgileri yükleniyor...</div></div></div><div><div class="muted" id="todayLabel"></div><button id="notifyBtn" class="install" style="margin-right:6px">🔔 Bildirimleri Aç</button><button id="installBtn" class="install" hidden>📲 Uygulamayı Yükle</button></div></div>
+<div class="top"><div><div style="display:flex;align-items:center;gap:10px"><div class="dash-mark">N</div><div><h1>NEXORA</h1><div id="business" class="muted">İşletme bilgileri yükleniyor...</div></div></div><div><div class="muted" id="todayLabel"></div><button id="notifyBtn" class="install" style="margin-right:6px">🔔 Bildirimleri Aç</button><button id="installBtn" class="install" hidden>📲 Uygulamayı Yükle</button><button id="logoutBtn" class="install">Çıkış</button></div></div>
 <div class="grid">
 <div class="card"><div class="label">BUGÜNÜN RANDEVULARI</div><div class="stat" id="todayCount">0</div></div>
 <div class="card"><div class="label">BEKLEYEN</div><div class="stat" id="pendingCount">0</div></div>
 <div class="card"><div class="label">ONAYLANAN</div><div class="stat" id="confirmedCount">0</div></div>
 <div class="card"><div class="label">MÜŞTERİLER</div><div class="stat" id="customerCount">0</div></div>
+<div class="card"><div class="label">MESAJLAR</div><div class="stat" id="messageCount">0</div></div>
 </div>
 <div class="layout"><main>
 <div class="card"><h2>📥 Müşteri Mesajları</h2><div id="messages" class="muted">Yükleniyor...</div></div>
@@ -78,12 +79,12 @@ async function setStatus(id,status){const r=await fetch("/api/appointments/statu
 function actionButtons(x){return x.status==="pending"?'<button class="approve" onclick="setStatus(\''+escapeHtml(x.id)+'\',\'confirmed\')">✓ Onayla</button><button class="cancel" onclick="setStatus(\''+escapeHtml(x.id)+'\',\'cancelled\')">✕ İptal</button>':"";}
 function appointmentTable(items){if(!items.length)return '<div class="muted">Randevu bulunmuyor.</div>';return '<div class="scroll"><table><tr><th>Müşteri</th><th>Saat</th><th>Hizmet</th><th>Durum</th><th>İşlem</th></tr>'+items.map(x=>'<tr><td>'+escapeHtml(x.customer_name)+'</td><td>'+escapeHtml(x.time)+'</td><td>'+escapeHtml(x.service)+'</td><td>'+badge(x.status)+'</td><td>'+actionButtons(x)+'</td></tr>').join("")+"</table></div>";}
 async function loadDashboard(){
- const [ar,mr]=await Promise.all([fetch("/api/appointments"),fetch("/api/messages")]);const items=await ar.json(),messages=await mr.json();
+ const [ar,mr,cr,rr]=await Promise.all([fetch("/api/appointments"),fetch("/api/messages"),fetch("/api/customers"),fetch("/api/reports")]);const items=ar.ok?await ar.json():[],messages=mr.ok?await mr.json():[],customers=cr.ok?await cr.json():[],report=rr.ok?await rr.json():null;
  checkAppointmentNotifications(items); checkUpcomingReminders(items);
- const todayItems=items.filter(x=>x.date===today),pending=items.filter(x=>x.status==="pending"),confirmed=items.filter(x=>x.status==="confirmed"),unique=[...new Map(items.filter(x=>x.phone).map(x=>[x.phone,x])).values()];
- document.getElementById("todayCount").textContent=todayItems.length;document.getElementById("pendingCount").textContent=pending.length;document.getElementById("confirmedCount").textContent=confirmed.length;document.getElementById("customerCount").textContent=unique.length;
+ const todayItems=items.filter(x=>x.date===today),pending=items.filter(x=>x.status==="pending"),confirmed=items.filter(x=>x.status==="confirmed");
+ document.getElementById("todayCount").textContent=todayItems.length;document.getElementById("pendingCount").textContent=pending.length;document.getElementById("confirmedCount").textContent=confirmed.length;document.getElementById("customerCount").textContent=customers.length;document.getElementById("messageCount").textContent=messages.length;
  document.getElementById("todayAppointments").innerHTML=appointmentTable(todayItems);document.getElementById("pendingAppointments").innerHTML=appointmentTable(pending);
- document.getElementById("customers").innerHTML=unique.length?'<div class="scroll"><table><tr><th>Müşteri</th><th>Telefon</th><th>Son randevu</th><th>Hizmet</th></tr>'+unique.map(x=>'<tr><td>'+escapeHtml(x.customer_name)+'</td><td>'+escapeHtml(x.phone)+'</td><td>'+escapeHtml(x.date)+' '+escapeHtml(x.time)+'</td><td>'+escapeHtml(x.service)+'</td></tr>').join("")+"</table></div>":"<div class="muted">Henüz müşteri yok.</div>";
+ document.getElementById("customers").innerHTML=customers.length?'<div class="scroll"><table><tr><th>Müşteri</th><th>Telefon</th><th>Güncellenme</th></tr>'+customers.map(x=>'<tr><td>'+escapeHtml(x.name)+'</td><td>'+escapeHtml(x.phone)+'</td><td>'+escapeHtml(x.updated_at)+'</td></tr>').join("")+"</table></div>":"<div class="muted">Henüz müşteri yok.</div>";
  document.getElementById("messages").innerHTML=messages.length?'<div class="scroll"><table><tr><th>Kanal</th><th>Müşteri</th><th>Mesaj</th><th>AI Niyeti</th><th>Zaman</th></tr>'+messages.slice().reverse().map(x=>'<tr><td class="channel">'+escapeHtml(x.channel)+'</td><td class="'+(x.customer_name?"unread":"")+'">'+escapeHtml(x.customer_name||"Bilinmiyor")+(x.phone?'<span class="pill">'+escapeHtml(x.phone)+"</span>":"")+"</td><td class="message">"+escapeHtml(x.message)+"</td><td>"+escapeHtml(x.intent||"other")+"</td><td>"+escapeHtml(x.created_at)+"</td></tr>").join("")+"</table></div>":"<div class="muted">Henüz müşteri mesajı yok.</div>";
 }
 fetch("/api/business").then(r=>r.json()).then(b=>document.getElementById("business").textContent=b.business_name+" • "+b.sector+" • "+b.working_hours).catch(()=>{});
@@ -130,9 +131,10 @@ loadBusinessSettings();
 async function loadTeam(){
  const r=await fetch("/api/users"); if(!r.ok){document.getElementById("teamList").textContent="Ekip bilgisi alınamadı.";return}
  const users=await r.json();
- document.getElementById("teamList").innerHTML=users.map(u=>'<div style="padding:12px 0;border-bottom:1px solid #edf0f2"><div style="display:flex;justify-content:space-between;gap:10px;align-items:center"><div><b>'+escapeHtml(u.email)+'</b><div class="muted" style="font-size:12px;margin-top:3px">Hesap aktif • '+escapeHtml(u.role)+'</div></div><span class="pill">'+escapeHtml(u.role)+'</span></div></div>').join("");
+ document.getElementById("teamList").innerHTML=users.map(u=>'<div style="padding:12px 0;border-bottom:1px solid #edf0f2"><div style="display:flex;justify-content:space-between;gap:10px;align-items:center"><div><b>'+escapeHtml(u.email)+'</b><div class="muted" style="font-size:12px;margin-top:3px">Hesap aktif • '+escapeHtml(u.role)+'</div></div><div style="display:flex;gap:8px;align-items:center"><span class="pill">'+escapeHtml(u.role)+'</span>'+(u.role==="staff"?'<button class="install" onclick="editTeamPermissions('+u.id+',\''+escapeHtml(u.email)+'\')">Yetkiler</button>':"")+'</div></div></div>').join("");
 }
 loadTeam();
+document.getElementById("logoutBtn").addEventListener("click",async()=>{await fetch("/api/auth/logout",{method:"POST"});location.reload();});
 document.getElementById("teamForm").addEventListener("submit",async e=>{
  e.preventDefault();
  const r=await fetch("/api/users/create",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:document.getElementById("teamEmail").value,password:document.getElementById("teamPassword").value,role:"staff"})});
