@@ -429,6 +429,29 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def do_HEAD(self):
+        parsed = urlparse(self.path)
+        if parsed.path in ("/", "/index.html"):
+            try:
+                size = os.path.getsize(HTML_PATH)
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Length", str(size))
+                self.end_headers()
+            except FileNotFoundError:
+                self.send_response(404)
+                self.end_headers()
+            return
+        if parsed.path == "/health":
+            body = b'{"status":"ok","service":"AI \\u0130\\u015fletme Asistan\\u0131"}'
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            return
+        self.send_response(404)
+        self.end_headers()
+
     def do_OPTIONS(self):
         self.send_response(204)
         self.send_header("Access-Control-Allow-Origin", "*")
