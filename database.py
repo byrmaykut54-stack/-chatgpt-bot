@@ -59,20 +59,6 @@ CREATE TABLE IF NOT EXISTS messages (
 CREATE INDEX IF NOT EXISTS messages_business_created_idx
 ON messages (business_id, created_at DESC);
 
-CREATE TABLE IF NOT EXISTS audit_logs (
-    id BIGSERIAL PRIMARY KEY,
-    business_id BIGINT NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
-    user_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
-    action TEXT NOT NULL,
-    target_type TEXT NOT NULL DEFAULT '',
-    target_id TEXT NOT NULL DEFAULT '',
-    details JSONB NOT NULL DEFAULT '{}'::jsonb,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE INDEX IF NOT EXISTS audit_logs_business_created_idx
-ON audit_logs (business_id, created_at DESC);
-
 CREATE TABLE IF NOT EXISTS users (
     id BIGSERIAL PRIMARY KEY,
     business_id BIGINT NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
