@@ -59,6 +59,20 @@ CREATE TABLE IF NOT EXISTS messages (
 CREATE INDEX IF NOT EXISTS messages_business_created_idx
 ON messages (business_id, created_at DESC);
 
+CREATE TABLE IF NOT EXISTS audit_logs (
+    id BIGSERIAL PRIMARY KEY,
+    business_id BIGINT NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
+    user_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
+    action TEXT NOT NULL,
+    target_type TEXT NOT NULL DEFAULT '',
+    target_id TEXT NOT NULL DEFAULT '',
+    details JSONB NOT NULL DEFAULT '{}'::jsonb,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS audit_logs_business_created_idx
+ON audit_logs (business_id, created_at DESC);
+
 CREATE TABLE IF NOT EXISTS users (
     id BIGSERIAL PRIMARY KEY,
     business_id BIGINT NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
@@ -337,6 +351,22 @@ def update_user_role(business_id,user_id,role):
         conn.execute("UPDATE users SET role=%s WHERE id=%s AND business_id=%s",(role,user_id,business_id))
         conn.commit()
 
+
+def delete_user(business_id, user_id):
+    with connection() as conn:
+        row=conn.execute("DELETE FROM users WHERE id=%s AND business_id=%s RETURNING id",(user_id,business_id)).fetchone()
+        conn.commit()
+        return bool(row)
+
+def write_audit_log(business_id, user_id, action, target_type="", target_id="", details=None):
+    with connection() as conn:
+        conn.execute("INSERT INTO audit_logs (business_id,user_id,action,target_type,target_id,details) VALUES (%s,%s,%s,%s,%s,%s)",
+                     (business_id,user_id,action,target_type,str(target_id),psycopg.types.json.Json(details or {})))
+        conn.commit()
+
+def list_audit_logs(business_id, limit=100):
+    with connection() as conn:
+        return conn.execute("SELECT id,user_id,action,target_type,target_id,details,created_at FROM audit_logs WHERE business_id=%s ORDER BY created_at DESC LIMIT %s",(business_id,min(max(int(limit),1),200))).fetchall()
 
 def get_user_permissions(user_id):
     with connection() as conn:
