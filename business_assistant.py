@@ -57,6 +57,12 @@ def save_json(path, data):
 def load_config():
     return load_json(CONFIG_PATH, DEFAULT_CONFIG)
 
+def load_config_for_user(user):
+    if user and database_enabled():
+        value = user[5]
+        return json.loads(value) if isinstance(value, str) else value
+    return load_config()
+
 def database_enabled():
     return bool(database and database.enabled())
 
