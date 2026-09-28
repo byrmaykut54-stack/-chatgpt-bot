@@ -458,6 +458,8 @@ class Handler(BaseHTTPRequestHandler):
         if parsed.path == "/api/business":
             user=auth_required(self)
             if not user: return
+            if not user_can(user,"business_settings"):
+                self.send_json(403,{"error":"İşletme ayarlarına erişim yetkiniz yok."}); return
             self.send_json(200, business_config_for_user(user)); return
         if parsed.path == "/api/appointments":
             user=auth_required(self)
