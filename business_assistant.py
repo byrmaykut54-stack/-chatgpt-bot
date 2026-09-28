@@ -695,6 +695,22 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json(200, {"status": "ok", "service": "AI İşletme Asistanı"}); return
         self.send_json(404, {"error": "Not found"})
 
+    def csrf_request_allowed(self):
+        """Allow cookie-authenticated state changes only from our own origin."""
+        origin = self.headers.get("Origin", "").strip().rstrip("/")
+        referer = self.headers.get("Referer", "").strip()
+        allowed = os.environ.get("ALLOWED_ORIGIN", "").strip().rstrip("/")
+        if not allowed:
+            host = self.headers.get("Host", "").strip()
+            if not host:
+                return False
+            allowed = "https://" + host
+        if origin:
+            return hmac.compare_digest(origin, allowed)
+        if referer:
+            return referer.startswith(allowed + "/") or referer == allowed
+        return False
+
     def do_POST(self):
         try:
             length = int(self.headers.get("Content-Length", "0"))
@@ -705,6 +721,20 @@ class Handler(BaseHTTPRequestHandler):
 
             if self.path == "/webhook/whatsapp" and not verify_whatsapp_signature(raw_body, self.headers.get("X-Hub-Signature-256", "")):
                 self.send_json(403, {"error": "WhatsApp webhook imza doğrulaması başarısız"})
+                return
+
+            # Browser session endpoints must be same-origin. Login/register are
+            # intentionally excluded because they do not yet have an authenticated session.
+            csrf_exempt = {
+                "/api/auth/register",
+                "/api/auth/login",
+                "/api/auth/logout",
+                "/webhook/whatsapp",
+                "/webhook/iyzico/subscription",
+                "/webhook/billing",
+            }
+            if self.path not in csrf_exempt and cookie_token(self) and not self.csrf_request_allowed():
+                self.send_json(403, {"error": "İstek kaynağı doğrulanamadı."})
                 return
 
             data = json.loads(raw_body)
