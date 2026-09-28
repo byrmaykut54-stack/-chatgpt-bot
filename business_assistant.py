@@ -4,6 +4,8 @@ import json
 import os
 import re
 import urllib.request
+import smtplib
+from email.message import EmailMessage
 from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import parse_qs, urlparse
@@ -81,6 +83,33 @@ def verify_password(password, stored):
         return hmac.compare_digest(derived.hex(), digest_hex)
     except Exception:
         return False
+
+def send_email(to_address, subject, body):
+    host=os.environ.get("SMTP_HOST","").strip()
+    port=int(os.environ.get("SMTP_PORT","587") or 587)
+    username=os.environ.get("SMTP_USERNAME","").strip()
+    password=os.environ.get("SMTP_PASSWORD","")
+    sender=os.environ.get("SMTP_FROM",username).strip()
+    if not host or not sender:
+        return False
+    msg=EmailMessage()
+    msg["From"]=sender
+    msg["To"]=to_address
+    msg["Subject"]=subject
+    msg.set_content(body)
+    with smtplib.SMTP(host,port,timeout=20) as smtp:
+        smtp.starttls()
+        if username:
+            smtp.login(username,password)
+        smtp.send_message(msg)
+    return True
+
+def frontend_base_url():
+    return os.environ.get("PUBLIC_APP_URL","").strip().rstrip("/") or ("https://" + os.environ.get("HOST","").strip() if os.environ.get("HOST") else "")
+
+def make_one_time_token():
+    token=os.urandom(32).hex()
+    return token, hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 def cookie_token(handler):
     for part in handler.headers.get("Cookie", "").split(";"):
@@ -823,6 +852,41 @@ class Handler(BaseHTTPRequestHandler):
                 database.write_audit_log(user[1],user[0],"subscription_cancelled","subscription",record.get("id"),{"provider":record.get("provider","")})
                 self.send_json(200,{"success":True}); return
 
+            if self.path == "/api/auth/forgot-password":
+                email=str(data.get("email","")).strip().lower()
+                if len(email)>254 or not email or "@" not in email:
+                    self.send_json(200,{"success":True,"message":"Eğer hesap varsa sıfırlama bağlantısı e-posta adresinize gönderildi."}); return
+                user=database.get_user_by_email(email) if database_enabled() else None
+                if user:
+                    token,token_hash=make_one_time_token()
+                    database.create_password_reset_token(token_hash,user[0],datetime.now(timezone.utc)+timedelta(minutes=30))
+                    base=frontend_base_url()
+                    if base:
+                        try:
+                            send_email(user[2],"NEXORA şifre sıfırlama",f"NEXORA şifrenizi yenilemek için bağlantı:\n{base}/?reset_token={token}\n\nBağlantı 30 dakika geçerlidir.")
+                        except Exception:
+                            pass
+                self.send_json(200,{"success":True,"message":"Eğer hesap varsa sıfırlama bağlantısı e-posta adresinize gönderildi."}); return
+
+            if self.path == "/api/auth/reset-password":
+                token=str(data.get("token","")).strip()
+                password=str(data.get("password",""))
+                if len(token)<40 or len(password)<8 or len(password)>128:
+                    self.send_json(400,{"error":"Geçersiz sıfırlama bilgisi."}); return
+                user_id=database.consume_password_reset_token(hashlib.sha256(token.encode("utf-8")).hexdigest()) if database_enabled() else None
+                if not user_id:
+                    self.send_json(400,{"error":"Sıfırlama bağlantısı geçersiz veya süresi dolmuş."}); return
+                database.set_user_password(user_id,hash_password(password))
+                self.send_json(200,{"success":True,"message":"Şifreniz güncellendi. Yeni şifrenizle giriş yapabilirsiniz."}); return
+
+            if self.path == "/api/auth/verify-email":
+                token=str(data.get("token","")).strip()
+                user_id=database.consume_email_verification_token(hashlib.sha256(token.encode("utf-8")).hexdigest()) if database_enabled() and len(token)>=40 else None
+                if not user_id:
+                    self.send_json(400,{"error":"Doğrulama bağlantısı geçersiz veya süresi dolmuş."}); return
+                database.mark_email_verified(user_id)
+                self.send_json(200,{"success":True,"message":"E-posta adresiniz doğrulandı."}); return
+
             if self.path == "/api/auth/register":
                 client_key=self.client_address[0] if self.client_address else "unknown"
                 if rate_limited("register:"+client_key, REGISTER_RATE_LIMIT, REGISTER_RATE_WINDOW):
@@ -842,6 +906,14 @@ class Handler(BaseHTTPRequestHandler):
                 config["business_name"]=business_name
                 business_id=database.create_business(business_name,config)
                 user_id=database.create_user(email,hash_password(password),business_id,"owner")
+                verification_token,verification_hash=make_one_time_token()
+                database.create_email_verification_token(verification_hash,user_id,datetime.now(timezone.utc)+timedelta(hours=24))
+                base=frontend_base_url()
+                if base:
+                    try:
+                        send_email(email,"NEXORA e-posta doğrulama",f"NEXORA hesabınızı doğrulamak için bağlantı:\n{base}/?verify_token={verification_token}\n\nBağlantı 24 saat geçerlidir.")
+                    except Exception:
+                        pass
                 token=os.urandom(32).hex()
                 expires=None
                 database.create_session(hashlib.sha256(token.encode("utf-8")).hexdigest(),user_id,expires)
