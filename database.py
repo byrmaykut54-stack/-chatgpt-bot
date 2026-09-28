@@ -462,8 +462,15 @@ def update_subscription_status(business_id, status, cancel_at_period_end=None, p
             conn.execute("UPDATE subscriptions SET status=%s, cancel_at_period_end=%s, current_period_end=COALESCE(%s,current_period_end), updated_at=NOW() WHERE business_id=%s", (status,cancel_at_period_end,period_end,business_id))
         if status in {"active","trialing"}:
             conn.execute("UPDATE businesses SET plan='pro', status='active' WHERE id=%s", (business_id,))
-        elif status in {"cancelled","canceled","past_due","unpaid","inactive"}:
-            conn.execute("UPDATE businesses SET plan='trial', status='active', trial_ends_at=LEAST(COALESCE(trial_ends_at,NOW()), NOW()) WHERE id=%s", (business_id,))
+        elif status in {"cancelled","canceled","inactive"}:
+            if cancel_at_period_end and period_end:
+                conn.execute("UPDATE businesses SET plan='pro', status='active' WHERE id=%s", (business_id,))
+            else:
+                conn.execute("UPDATE businesses SET plan='trial', status='active', trial_ends_at=LEAST(COALESCE(trial_ends_at,NOW()), NOW()) WHERE id=%s", (business_id,))
+        elif status in {"past_due","unpaid"}:
+            # Keep Pro during provider retry/grace handling; the provider webhook can
+            # explicitly downgrade when the subscription is actually cancelled.
+            conn.execute("UPDATE businesses SET plan='pro', status='active' WHERE id=%s", (business_id,))
         conn.commit()
 
 def get_business_by_provider_subscription(provider_subscription_id):
