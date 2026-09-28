@@ -132,6 +132,39 @@ def verify_billing_signature(raw_body, signature):
     expected="sha256="+hmac.new(secret.encode("utf-8"),raw_body,hashlib.sha256).hexdigest()
     return hmac.compare_digest(expected,signature.strip())
 
+
+def iyzico_authorization(uri_path, body_text):
+    api_key=os.environ.get("IYZICO_API_KEY","").strip()
+    secret_key=os.environ.get("IYZICO_SECRET_KEY","").strip()
+    if not api_key or not secret_key:
+        raise RuntimeError("IYZICO_API_KEY ve IYZICO_SECRET_KEY yapılandırılmalı.")
+    random_key=str(int(datetime.now(timezone.utc).timestamp()*1000))+os.urandom(6).hex()
+    signature=hmac.new(secret_key.encode("utf-8"),(random_key+uri_path+body_text).encode("utf-8"),hashlib.sha256).hexdigest()
+    raw="apiKey:"+api_key+"&randomKey:"+random_key+"&signature:"+signature
+    return "IYZWSv2 "+__import__("base64").b64encode(raw.encode("utf-8")).decode("ascii"),random_key
+
+def iyzico_request(method, uri_path, payload=None):
+    base=os.environ.get("IYZICO_BASE_URL","https://api.iyzipay.com").rstrip("/")
+    body=json.dumps(payload or {},ensure_ascii=False,separators=(",",":"))
+    auth,rnd=iyzico_authorization(uri_path,body)
+    req=urllib.request.Request(base+uri_path,data=body.encode("utf-8") if method!="GET" else None,headers={"Authorization":auth,"x-iyzi-rnd":rnd,"Content-Type":"application/json"},method=method)
+    with urllib.request.urlopen(req,timeout=30) as response:
+        return json.load(response)
+
+def iyzico_start_checkout(user):
+    plan_ref=os.environ.get("IYZICO_PRICING_PLAN_REFERENCE_CODE","").strip()
+    if not plan_ref:
+        raise RuntimeError("IYZICO_PRICING_PLAN_REFERENCE_CODE yapılandırılmalı.")
+    config=business_config_for_user(user)
+    email=user[2]
+    local=email.split("@",1)[0]
+    name=config.get("business_name","NEXORA")
+    callback=os.environ.get("IYZICO_SUBSCRIPTION_CALLBACK_URL","").strip()
+    if not callback:
+        raise RuntimeError("IYZICO_SUBSCRIPTION_CALLBACK_URL yapılandırılmalı.")
+    payload={"locale":"tr","callbackUrl":callback,"pricingPlanReferenceCode":plan_ref,"subscriptionInitialStatus":"ACTIVE","conversationId":"nexora-"+str(user[1])+"-"+str(int(datetime.now(timezone.utc).timestamp())),"customer":{"name":name[:50],"surname":"Owner","email":email,"gsmNumber":config.get("phone",""),"billingAddress":{"address":config.get("address","NEXORA"),"zipCode":"","contactName":name[:100],"city":"Türkiye","country":"Türkiye"}}}
+    return iyzico_request("POST","/v2/subscription/checkoutform/initialize",payload)
+
 def user_can(user, module):
     if not user or not database_enabled(): return False
     if user[3] == 'owner': return True
@@ -640,10 +673,17 @@ class Handler(BaseHTTPRequestHandler):
                 if not user: return
                 if user[3] != "owner":
                     self.send_json(403,{"error":"Sadece işletme sahibi abonelik başlatabilir."}); return
-                checkout=os.environ.get("NEXORA_PAYMENT_URL","").strip()
-                if not checkout:
-                    self.send_json(503,{"error":"Pro ödeme bağlantısı henüz yapılandırılmadı.","setup_required":True}); return
-                self.send_json(200,{"checkout_url":checkout,"provider":os.environ.get("NEXORA_PAYMENT_PROVIDER","").strip()}); return
+                try:
+                    provider=os.environ.get("NEXORA_PAYMENT_PROVIDER","iyzico").strip().lower()
+                    if provider != "iyzico":
+                        raise RuntimeError("Desteklenen ödeme sağlayıcısı: iyzico.")
+                    result=iyzico_start_checkout(user)
+                    if result.get("status") != "success":
+                        self.send_json(502,{"error":result.get("errorMessage","iyzico ödeme formu oluşturulamadı."),"provider_response":result}); return
+                    self.send_json(200,{"provider":"iyzico","checkout_form_content":result.get("checkoutFormContent",""),"token":result.get("token",""),"conversation_id":result.get("conversationId","")})
+                except Exception as exc:
+                    self.send_json(503,{"error":str(exc),"setup_required":True})
+                return
 
             if self.path == "/api/billing/cancel":
                 user=auth_required(self)
