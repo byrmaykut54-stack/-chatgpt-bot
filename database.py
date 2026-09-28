@@ -92,6 +92,18 @@ CREATE TABLE IF NOT EXISTS subscriptions (
 
 CREATE INDEX IF NOT EXISTS subscriptions_status_idx ON subscriptions (status);
 
+CREATE TABLE IF NOT EXISTS billing_checkout_sessions (
+    id BIGSERIAL PRIMARY KEY,
+    business_id BIGINT NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
+    provider TEXT NOT NULL,
+    checkout_token TEXT NOT NULL UNIQUE,
+    conversation_id TEXT NOT NULL DEFAULT '',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    completed_at TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS billing_checkout_business_idx ON billing_checkout_sessions (business_id);
+
 CREATE TABLE IF NOT EXISTS sessions (
     id BIGSERIAL PRIMARY KEY,
     token_hash TEXT PRIMARY KEY,
@@ -459,3 +471,19 @@ def get_business_by_provider_subscription(provider_subscription_id):
         row=conn.execute("SELECT business_id FROM subscriptions WHERE provider_subscription_id=%s",(provider_subscription_id,)).fetchone()
     return row[0] if row else None
 
+
+def create_billing_checkout_session(business_id, provider, checkout_token, conversation_id):
+    with connection() as conn:
+        row=conn.execute("INSERT INTO billing_checkout_sessions (business_id,provider,checkout_token,conversation_id) VALUES (%s,%s,%s,%s) RETURNING id",(business_id,provider,checkout_token,conversation_id)).fetchone()
+        conn.commit()
+    return row[0]
+
+def get_billing_checkout_session(checkout_token):
+    with connection() as conn:
+        row=conn.execute("SELECT id,business_id,provider,checkout_token,conversation_id,completed_at FROM billing_checkout_sessions WHERE checkout_token=%s",(checkout_token,)).fetchone()
+    return row
+
+def complete_billing_checkout(checkout_token):
+    with connection() as conn:
+        conn.execute("UPDATE billing_checkout_sessions SET completed_at=NOW() WHERE checkout_token=%s",(checkout_token,))
+        conn.commit()
