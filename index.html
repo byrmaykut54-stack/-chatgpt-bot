@@ -34,7 +34,7 @@ input{width:100%;padding:12px 13px;border:1px solid #e0e5ea;background:#fbfcfd;b
 <input id="authBusiness" placeholder="İşletme adı" autocomplete="organization" style="display:none">
 <input id="authEmail" type="email" placeholder="E-posta" autocomplete="email" required>
 <input id="authPassword" type="password" placeholder="Şifre (en az 8 karakter)" autocomplete="current-password" required>
-<button class="primary full" type="submit">Giriş Yap</button>
+<button class="primary full" type="submit">Giriş Yap</button><button id="forgotBtn" class="full auth-secondary" type="button" style="margin-top:8px">Şifremi Unuttum</button>
 </form>
 <div class="auth-divider"><span>veya</span></div><button id="setupBtn" class="full auth-secondary" type="button">Yeni İşletme Hesabı Oluştur</button><div class="auth-toggle" id="authModeHint">Hesabınız yok mu? <button type="button" id="registerLink">Yeni işletme hesabı oluştur</button></div><div class="auth-benefit">✓ İşletme verileri birbirinden izole tutulur · ✓ Güvenli oturum · ✓ Deneme süresi boyunca temel özellikler</div><div class="auth-foot">Güvenli giriş · Verileriniz işletmenize özel tutulur</div></div></div><div class="nexora-corp"><span class="nexora-corp-line"></span><span>NEXORA</span><span class="nexora-corp-dot">•</span><span>İŞLETME YÖNETİM PLATFORMU</span><span class="nexora-corp-line"></span></div><div class="nexora-copyright">© 2026 NEXORA · Tüm hakları saklıdır</div>
 <div id="authError" style="color:#9b2420;margin-top:12px;font-size:14px"></div>
@@ -107,6 +107,12 @@ document.getElementById("chatForm").addEventListener("submit",async e=>{e.preven
 document.getElementById("notifyBtn").addEventListener("click",enableNotifications);
 document.getElementById("appointmentForm").addEventListener("submit",async e=>{e.preventDefault();const data={customer_name:document.getElementById("customer_name").value,phone:document.getElementById("phone").value,date:document.getElementById("date").value,time:document.getElementById("time").value,service:document.getElementById("service").value};const r=await fetch("/api/appointments",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(data)});if(r.ok){const x=await r.json().catch(()=>null);e.target.reset();loadDashboard();if(x&&x.appointment)appointmentNotification(x.appointment,"Yeni randevu");alert("Randevu kaydedildi.");}else{const x=await r.json();alert(x.error||"Randevu kaydedilemedi.");}});
 let deferredPrompt;window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferredPrompt=e;document.getElementById("installBtn").hidden=false;});document.getElementById("installBtn").addEventListener("click",async()=>{if(!deferredPrompt)return;deferredPrompt.prompt();await deferredPrompt.userChoice;deferredPrompt=null;document.getElementById("installBtn").hidden=true;});if("serviceWorker" in navigator)navigator.serviceWorker.register("./service-worker.js").catch(()=>{});
+async function handleAuthTokens(){
+ const q=new URLSearchParams(location.search);
+ const reset=q.get("reset_token"), verify=q.get("verify_token");
+ if(verify){const r=await fetch("/api/auth/verify-email",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({token:verify})});const x=await r.json().catch(()=>({}));alert(x.message||x.error||"E-posta doğrulama sonucu alınamadı.");history.replaceState({},document.title,location.pathname);}
+ if(reset){const p=prompt("Yeni şifrenizi girin (en az 8 karakter):");if(p){const r=await fetch("/api/auth/reset-password",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({token:reset,password:p})});const x=await r.json().catch(()=>({}));alert(x.message||x.error||"Şifre sıfırlama sonucu alınamadı.");}history.replaceState({},document.title,location.pathname);}
+}
 async function authInit(){
   const status=await fetch("/api/auth/status").then(r=>r.json()).catch(()=>({authenticated:false}));
   const screen=document.getElementById("authScreen"), app=document.getElementById("app");
@@ -114,6 +120,8 @@ async function authInit(){
   const setup=await fetch("/api/auth/setup-available").then(r=>r.json()).catch(()=>({available:false}));
   const setupBtn=document.getElementById("setupBtn"), business=document.getElementById("authBusiness"), form=document.getElementById("authForm");
   setupBtn.style.display="block";
+  document.getElementById("forgotBtn").onclick=async()=>{const email=prompt("NEXORA hesabınızdaki e-posta adresini girin:");if(!email)return;const r=await fetch("/api/auth/forgot-password",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email})});const x=await r.json().catch(()=>({}));alert(x.message||x.error||"İşlem tamamlandı.");};
+
   function switchToRegister(){business.style.display="block";business.required=true;form.querySelector("button").textContent="14 Günlük Denemeyi Başlat";setupBtn.style.display="none";form.dataset.mode="register";document.getElementById("authModeHint").innerHTML="Zaten hesabınız var mı? <button type="button" id="loginLink">Giriş yap</button>";document.getElementById("loginLink").onclick=switchToLogin;document.getElementById("authError").textContent="";} function switchToLogin(){business.style.display="none";business.required=false;form.querySelector("button").textContent="Giriş Yap";setupBtn.style.display="block";form.dataset.mode="login";document.getElementById("authModeHint").innerHTML="Hesabınız yok mu? <button type="button" id="registerLink">Yeni işletme hesabı oluştur</button>";document.getElementById("registerLink").onclick=switchToRegister;document.getElementById("authError").textContent="";} setupBtn.onclick=switchToRegister; document.getElementById("registerLink").onclick=switchToRegister;
   form.addEventListener("submit",async e=>{
     e.preventDefault();const mode=form.dataset.mode||"login";
@@ -125,7 +133,7 @@ async function authInit(){
     location.reload();
   });
 }
-authInit();
+handleAuthTokens().then(authInit);
 setInterval(()=>{if(document.getElementById("app").style.display!=="none")loadDashboard();},30000);
 const businessForm=document.getElementById("businessForm");
 async function loadBusinessSettings(){
