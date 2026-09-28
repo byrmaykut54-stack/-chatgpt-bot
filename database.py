@@ -271,3 +271,13 @@ def save_messages_by_business(business_id, items):
                 ON CONFLICT (id) DO UPDATE SET message_id=EXCLUDED.message_id,channel=EXCLUDED.channel,direction=EXCLUDED.direction,customer_name=EXCLUDED.customer_name,phone=EXCLUDED.phone,message=EXCLUDED.message,intent=EXCLUDED.intent""",
                 (item["id"],business_id,item.get("message_id",""),item.get("channel","web"),item.get("direction","inbound"),item.get("customer_name",""),item.get("phone",""),item.get("message",""),item.get("intent","other"),item.get("created_at")))
         conn.commit()
+
+
+def list_users(business_id):
+    with connection() as conn:
+        return conn.execute("SELECT id,email,role,created_at FROM users WHERE business_id=%s ORDER BY created_at",(business_id,)).fetchall()
+
+def update_user_role(business_id,user_id,role):
+    with connection() as conn:
+        conn.execute("UPDATE users SET role=%s WHERE id=%s AND business_id=%s",(role,user_id,business_id))
+        conn.commit()
