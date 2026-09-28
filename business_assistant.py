@@ -592,6 +592,12 @@ class Handler(BaseHTTPRequestHandler):
             except FileNotFoundError:
                 self.send_json(404, {"error": "index.html bulunamadı"})
             return
+        if parsed.path == "/billing/iyzico/callback":
+            token=(parse_qs(parsed.query).get("token") or parse_qs(parsed.query).get("checkoutFormToken") or [""])[0]
+            safe=json.dumps(token)
+            body='<!doctype html><html lang="tr"><head><meta charset="utf-8"><title>NEXORA Ödeme</title></head><body style="font-family:Arial;padding:40px;text-align:center"><h2>NEXORA</h2><p>Ödeme sonucu kontrol ediliyor...</p><script>fetch("/api/billing/complete",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({token:'+safe+'})}).then(()=>location.href="/").catch(()=>location.href="/");</script></body></html>'
+            self.send_response(200); self.send_header("Content-Type","text/html; charset=utf-8"); self.send_header("Content-Length",str(len(body.encode("utf-8")))); self.end_headers(); self.wfile.write(body.encode("utf-8")); return
+
         if parsed.path == "/api/auth/status":
             user=current_user(self)
             payload={"authenticated":bool(user),"email":user[2] if user else ""}
@@ -673,6 +679,27 @@ class Handler(BaseHTTPRequestHandler):
 
             data = json.loads(raw_body)
 
+            if self.path == "/api/billing/complete":
+                user=auth_required(self)
+                if not user: return
+                token=str(data.get("token","")).strip()
+                session=database.get_billing_checkout_session(token)
+                if not token or not session or session[1] != user[1]:
+                    self.send_json(404,{"error":"Ödeme oturumu bulunamadı."}); return
+                result=iyzico_request("GET","/v2/subscription/checkoutform/"+token)
+                if result.get("status") != "success":
+                    self.send_json(502,{"error":result.get("errorMessage","Ödeme sonucu alınamadı."),"provider_response":result}); return
+                info=result.get("data") or {}
+                sub_ref=str(info.get("referenceCode","")).strip()
+                customer_ref=str(info.get("customerReferenceCode","")).strip()
+                sub_status=str(info.get("subscriptionStatus","")).lower()
+                if not sub_ref:
+                    self.send_json(502,{"error":"iyzico abonelik referansı alınamadı."}); return
+                database.create_or_update_subscription(user[1],"iyzico",customer_ref,sub_ref,"active" if sub_status=="active" else "pending")
+                database.complete_billing_checkout(token)
+                database.write_audit_log(user[1],user[0],"subscription_started","subscription",sub_ref,{"provider":"iyzico"})
+                self.send_json(200,{"success":True,"subscription":database.get_subscription_record(user[1])}); return
+
             if self.path == "/webhook/iyzico/subscription":
                 signature=self.headers.get("X-IYZ-SIGNATURE-V3","")
                 if not verify_iyzico_subscription_webhook(data,signature):
@@ -708,7 +735,12 @@ class Handler(BaseHTTPRequestHandler):
                     result=iyzico_start_checkout(user)
                     if result.get("status") != "success":
                         self.send_json(502,{"error":result.get("errorMessage","iyzico ödeme formu oluşturulamadı."),"provider_response":result}); return
-                    self.send_json(200,{"provider":"iyzico","checkout_form_content":result.get("checkoutFormContent",""),"token":result.get("token",""),"conversation_id":result.get("conversationId","")})
+                    token=result.get("token","")
+                    conversation=result.get("conversationId","")
+                    if not token:
+                        self.send_json(502,{"error":"iyzico ödeme tokenı alınamadı."}); return
+                    database.create_billing_checkout_session(user[1],"iyzico",token,conversation)
+                    self.send_json(200,{"provider":"iyzico","checkout_form_content":result.get("checkoutFormContent",""),"token":token,"conversation_id":conversation})
                 except Exception as exc:
                     self.send_json(503,{"error":str(exc),"setup_required":True})
                 return
