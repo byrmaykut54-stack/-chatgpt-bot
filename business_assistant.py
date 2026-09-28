@@ -482,7 +482,11 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_OPTIONS(self):
         self.send_response(204)
-        self.send_header("Access-Control-Allow-Origin", "*")
+        origin = self.headers.get("Origin", "")
+        allowed = os.environ.get("ALLOWED_ORIGIN", "").strip()
+        if allowed and origin == allowed:
+            self.send_header("Access-Control-Allow-Origin", origin)
+            self.send_header("Vary", "Origin")
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.end_headers()
@@ -552,6 +556,16 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(403,{"error":"Ekip bilgilerine erişim yetkiniz yok."}); return
             rows=database.list_users(user[1])
             self.send_json(200,[{"id":r[0],"email":r[1],"role":r[2],"created_at":r[3].isoformat() if hasattr(r[3],"isoformat") else str(r[3])} for r in rows]); return
+        if parsed.path == "/api/audit":
+            user=auth_required(self)
+            if not user:
+                return
+            if user[3] != "owner":
+                self.send_json(403,{"error":"Sadece owner denetim kayıtlarını görebilir."})
+                return
+            rows=database.list_audit_logs(user[1])
+            self.send_json(200,[{"id":x[0],"user_id":x[1],"action":x[2],"target_type":x[3],"target_id":x[4],"details":x[5],"created_at":x[6].isoformat()} for x in rows])
+            return
         if parsed.path == "/health":
             self.send_json(200, {"status": "ok", "service": "AI İşletme Asistanı"}); return
         self.send_json(404, {"error": "Not found"})
@@ -631,7 +645,8 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_json(200, {"received": True, "processed": False}); return
                 if whatsapp_message_already_processed(incoming.get("message_id", ""), business_id):
                     self.send_json(200, {"received": True, "processed": False, "duplicate": True}); return
-                result = handle_customer_message(incoming["message"], "whatsapp", incoming["customer_name"], incoming["phone"], {"1": business_id, "5": database.get_business_config(business_id)})
+                whatsapp_user = (0, business_id, "", "owner", "", database.get_business_config(business_id))
+                result = handle_customer_message(incoming["message"], "whatsapp", incoming["customer_name"], incoming["phone"], whatsapp_user)
                 ok, send_result = send_whatsapp_text(incoming["phone"], result["reply"])
                 out = {"received": True, "processed": True, "result": result, "reply_sent": ok}
                 if not ok:
@@ -687,14 +702,6 @@ class Handler(BaseHTTPRequestHandler):
                 database.write_audit_log(user[1],user[0],"user_deleted","user",target,{"email":target_user[1]})
                 self.send_json(200,{"success":True}); return
 
-            if self.path == "/api/audit":
-                user=auth_required(self)
-                if not user or user[3] != "owner":
-                    if user: self.send_json(403,{"error":"Sadece owner denetim kayıtlarını görebilir."})
-                    return
-                rows=database.list_audit_logs(user[1])
-                self.send_json(200,[{"id":x[0],"user_id":x[1],"action":x[2],"target_type":x[3],"target_id":x[4],"details":x[5],"created_at":x[6].isoformat()} for x in rows]); return
-
             if self.path == "/api/users/permissions":
 
                 user=auth_required(self)
@@ -716,6 +723,7 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_json(400,{"error":"Owner hesabının yetkileri değiştirilemez."}); return
                 if not database.update_user_permissions(user[1],target,permissions):
                     self.send_json(404,{"error":"Çalışan bulunamadı"}); return
+                database.write_audit_log(user[1],user[0],"permissions_updated","user",target,{"permissions":permissions})
                 self.send_json(200,{"success":True,"permissions":permissions}); return
 
             if self.path == "/api/users/role":
@@ -734,6 +742,7 @@ class Handler(BaseHTTPRequestHandler):
                 if target_user[2] == "owner" and role == "staff" and database.count_owners(user[1]) <= 1:
                     self.send_json(400,{"error":"İşletmede en az bir owner kalmalıdır."}); return
                 database.update_user_role(user[1],target,role)
+                database.write_audit_log(user[1],user[0],"role_updated","user",target,{"role":role})
                 self.send_json(200,{"success":True,"role":role}); return
 
             if self.path == "/api/business":
