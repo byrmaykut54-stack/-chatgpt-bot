@@ -1,7 +1,7 @@
 {
-  "name": "AI İşletme Asistanı",
-  "short_name": "İşletme Asistanı",
-  "description": "AI destekli işletme ve randevu yönetim paneli",
+  "name": "NEXORA",
+  "short_name": "NEXORA",
+  "description": "Premium işletme ve randevu yönetim platformu",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
