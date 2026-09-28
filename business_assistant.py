@@ -18,6 +18,11 @@ try:
 except ImportError:
     database = None
 
+try:
+    import database
+except ImportError:
+    database = None
+
 DEFAULT_CONFIG = {
     "business_name": "Demo İşletme",
     "sector": "Berber",
