@@ -1,3 +1,5 @@
+import hashlib
+import hmac
 import json
 import os
 import urllib.request
@@ -191,6 +193,20 @@ def whatsapp_verify(query):
         return 200, challenge
     return 403, "Webhook doğrulaması başarısız"
 
+def verify_whatsapp_signature(raw_body, signature):
+    secret = os.environ.get("META_APP_SECRET", "").strip()
+    if not secret:
+        return True
+    if not signature or not signature.startswith("sha256="):
+        return False
+    expected = "sha256=" + hmac.new(secret.encode("utf-8"), raw_body, hashlib.sha256).hexdigest()
+    return hmac.compare_digest(expected, signature)
+
+def whatsapp_message_already_processed(message_id):
+    if not message_id:
+        return False
+    return any(item.get("message_id") == message_id for item in load_messages())
+
 def parse_whatsapp_message(data):
     try:
         value = data["entry"][0]["changes"][0]["value"]
@@ -256,12 +272,20 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         try:
             length = int(self.headers.get("Content-Length", "0"))
-            data = json.loads(self.rfile.read(length) or "{}")
+            raw_body = self.rfile.read(length) or b"{}"
+
+            if self.path == "/webhook/whatsapp" and not verify_whatsapp_signature(raw_body, self.headers.get("X-Hub-Signature-256", "")):
+                self.send_json(403, {"error": "WhatsApp webhook imza doğrulaması başarısız"})
+                return
+
+            data = json.loads(raw_body)
 
             if self.path == "/webhook/whatsapp":
                 incoming = parse_whatsapp_message(data)
                 if not incoming:
                     self.send_json(200, {"received": True, "processed": False}); return
+                if whatsapp_message_already_processed(incoming.get("message_id", "")):
+                    self.send_json(200, {"received": True, "processed": False, "duplicate": True}); return
                 result = handle_customer_message(incoming["message"], "whatsapp", incoming["customer_name"], incoming["phone"])
                 ok, send_result = send_whatsapp_text(incoming["phone"], result["reply"])
                 out = {"received": True, "processed": True, "result": result, "reply_sent": ok}
@@ -269,7 +293,7 @@ class Handler(BaseHTTPRequestHandler):
                     out["reply_error"] = send_result
                 else:
                     messages = load_messages()
-                    messages.append({"id": datetime.utcnow().strftime("%Y%m%d%H%M%S%f"), "channel": "whatsapp", "direction": "outbound", "customer_name": incoming["customer_name"], "phone": incoming["phone"], "message": result["reply"], "intent": "ai_reply", "created_at": datetime.utcnow().isoformat() + "Z"})
+                    messages.append({"id": datetime.utcnow().strftime("%Y%m%d%H%M%S%f"), "message_id": incoming.get("message_id", ""), "channel": "whatsapp", "direction": "outbound", "customer_name": incoming["customer_name"], "phone": incoming["phone"], "message": result["reply"], "intent": "ai_reply", "created_at": datetime.utcnow().isoformat() + "Z"})
                     save_messages(messages)
                 self.send_json(200, out); return
 
