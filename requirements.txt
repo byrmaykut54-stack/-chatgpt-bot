@@ -1,0 +1,2 @@
+# AI Business Assistant MVP
+# Uses only Python standard library; no third-party package is required.
