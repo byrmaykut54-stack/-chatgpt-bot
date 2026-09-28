@@ -86,7 +86,7 @@ async function loadSubscription(){
  else if(s.trial_ends_at){info.textContent="Deneme sonu: "+new Date(s.trial_ends_at).toLocaleDateString("tr-TR");}
  const btn=document.getElementById("proBtn");
  btn.textContent=plan==="PRO"?"Aboneliği İptal Et":"Pro'ya Geç";
- btn.onclick=async()=>{const endpoint=plan==="PRO"?"/api/billing/cancel":"/api/billing/start"; const r=await fetch(endpoint,{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"}); const x=await r.json().catch(()=>({})); if(r.ok&&x.checkout_url){window.location.href=x.checkout_url;return;} if(r.ok){alert("İşlem tamamlandı.");loadSubscription();return;} alert(x.error||"İşlem gerçekleştirilemedi.");};
+ btn.onclick=async()=>{const endpoint=plan==="PRO"?"/api/billing/cancel":"/api/billing/start"; const r=await fetch(endpoint,{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"}); const x=await r.json().catch(()=>({})); if(r.ok&&x.checkout_form_content){document.open();document.write('<!doctype html><html lang="tr"><head><meta charset="utf-8"><title>NEXORA Pro</title></head><body><div id="iyzico-checkout-form" class="responsive"></div>'+x.checkout_form_content+'</body></html>');document.close();return;} if(r.ok&&x.checkout_url){window.location.href=x.checkout_url;return;} if(r.ok){alert("İşlem tamamlandı.");loadSubscription();return;} alert(x.error||"İşlem gerçekleştirilemedi.");};
 }
 async function loadDashboard(){
  const [ar,mr,cr,rr]=await Promise.all([fetch("/api/appointments"),fetch("/api/messages"),fetch("/api/customers"),fetch("/api/reports")]);const items=ar.ok?await ar.json():[],messages=mr.ok?await mr.json():[],customers=cr.ok?await cr.json():[],report=rr.ok?await rr.json():null;
