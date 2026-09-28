@@ -74,6 +74,24 @@ CREATE TABLE IF NOT EXISTS users (
     UNIQUE (email)
 );
 
+CREATE TABLE IF NOT EXISTS subscriptions (
+    id BIGSERIAL PRIMARY KEY,
+    business_id BIGINT NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
+    provider TEXT NOT NULL DEFAULT '',
+    provider_customer_id TEXT NOT NULL DEFAULT '',
+    provider_subscription_id TEXT NOT NULL DEFAULT '',
+    plan TEXT NOT NULL DEFAULT 'pro',
+    status TEXT NOT NULL DEFAULT 'inactive',
+    current_period_start TIMESTAMPTZ,
+    current_period_end TIMESTAMPTZ,
+    cancel_at_period_end BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (business_id)
+);
+
+CREATE INDEX IF NOT EXISTS subscriptions_status_idx ON subscriptions (status);
+
 CREATE TABLE IF NOT EXISTS sessions (
     id BIGSERIAL PRIMARY KEY,
     token_hash TEXT PRIMARY KEY,
@@ -385,3 +403,53 @@ def get_business_subscription(business_id):
     trial_ends = row[2]
     active = row[1] == "active" and (row[0] != "trial" or trial_ends is None or trial_ends > datetime.now(timezone.utc))
     return {"plan":row[0],"status":row[1],"trial_ends_at":trial_ends.isoformat() if trial_ends else None,"trial_active":active}
+
+def get_subscription_record(business_id):
+    with connection() as conn:
+        row = conn.execute(
+            "SELECT id,provider,provider_customer_id,provider_subscription_id,plan,status,current_period_start,current_period_end,cancel_at_period_end FROM subscriptions WHERE business_id=%s",
+            (business_id,)
+        ).fetchone()
+    if not row:
+        return None
+    return {
+        "id": row[0], "provider": row[1], "provider_customer_id": row[2],
+        "provider_subscription_id": row[3], "plan": row[4], "status": row[5],
+        "current_period_start": row[6].isoformat() if row[6] else None,
+        "current_period_end": row[7].isoformat() if row[7] else None,
+        "cancel_at_period_end": bool(row[8])
+    }
+
+def create_or_update_subscription(business_id, provider, provider_customer_id, provider_subscription_id, status="active", period_start=None, period_end=None, cancel_at_period_end=False):
+    with connection() as conn:
+        row = conn.execute("""
+            INSERT INTO subscriptions
+            (business_id,provider,provider_customer_id,provider_subscription_id,plan,status,current_period_start,current_period_end,cancel_at_period_end,updated_at)
+            VALUES (%s,%s,%s,%s,'pro',%s,%s,%s,%s,NOW())
+            ON CONFLICT (business_id) DO UPDATE SET
+              provider=EXCLUDED.provider,
+              provider_customer_id=EXCLUDED.provider_customer_id,
+              provider_subscription_id=EXCLUDED.provider_subscription_id,
+              plan='pro',
+              status=EXCLUDED.status,
+              current_period_start=EXCLUDED.current_period_start,
+              current_period_end=EXCLUDED.current_period_end,
+              cancel_at_period_end=EXCLUDED.cancel_at_period_end,
+              updated_at=NOW()
+            RETURNING id
+        """, (business_id,provider,provider_customer_id,provider_subscription_id,status,period_start,period_end,cancel_at_period_end)).fetchone()
+        conn.execute("UPDATE businesses SET plan='pro', status='active' WHERE id=%s", (business_id,))
+        conn.commit()
+        return row[0] if row else None
+
+def update_subscription_status(business_id, status, cancel_at_period_end=None, period_end=None):
+    with connection() as conn:
+        if cancel_at_period_end is None:
+            conn.execute("UPDATE subscriptions SET status=%s, current_period_end=COALESCE(%s,current_period_end), updated_at=NOW() WHERE business_id=%s", (status,period_end,business_id))
+        else:
+            conn.execute("UPDATE subscriptions SET status=%s, cancel_at_period_end=%s, current_period_end=COALESCE(%s,current_period_end), updated_at=NOW() WHERE business_id=%s", (status,cancel_at_period_end,period_end,business_id))
+        if status in {"active","trialing"}:
+            conn.execute("UPDATE businesses SET plan='pro', status='active' WHERE id=%s", (business_id,))
+        elif status in {"cancelled","canceled","past_due","unpaid","inactive"}:
+            conn.execute("UPDATE businesses SET plan='trial', status='active', trial_ends_at=LEAST(COALESCE(trial_ends_at,NOW()), NOW()) WHERE id=%s", (business_id,))
+        conn.commit()
