@@ -53,7 +53,7 @@ input{width:100%;padding:11px;border:1px solid #dfe4e8;border-radius:9px;margin:
 <input id="teamEmail" type="email" placeholder="Çalışan e-postası" required>
 <input id="teamPassword" type="password" placeholder="Geçici şifre (en az 8 karakter)" minlength="8" required>
 <button class="primary full">Çalışan Hesabı Oluştur</button>
-</form><div id="teamStatus" class="muted" style="margin:8px 0"></div><div id="teamList" class="muted">Yükleniyor...</div></div><div class="card"><h2>⚙️ İşletme Ayarları</h2><form id="businessForm">
+</form><div id="teamStatus" class="muted" style="margin:8px 0"></div><div id="teamPermissions" style="margin-top:12px"></div><div id="teamList" class="muted">Yükleniyor...</div></div><div class="card"><h2>⚙️ İşletme Ayarları</h2><form id="businessForm">
 <input id="cfgName" placeholder="İşletme adı" required><input id="cfgSector" placeholder="Sektör" required>
 <input id="cfgHours" placeholder="Çalışma saatleri: 09:00-18:00" required><input id="cfgAddress" placeholder="Adres">
 <input id="cfgClosed" placeholder="Kapalı günler: Pazar">
@@ -135,4 +135,12 @@ document.getElementById("teamForm").addEventListener("submit",async e=>{
 
 
 
+</script><script>async function editTeamPermissions(userId,email){
+ const names=[["appointments","Randevular"],["customers","Müşteriler"],["messages","Mesajlar"],["business_settings","İşletme ayarları"],["team","Ekip"],["reports","Raporlar"]];
+ const permissions={};
+ for(const [k,n] of names){ permissions[k]=window.confirm(email+" için "+n+" yetkisi verilsin mi?"); }
+ const r=await fetch("/api/users/permissions",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({user_id:userId,permissions})});
+ const x=await r.json().catch(()=>({}));
+ document.getElementById("teamStatus").textContent=r.ok?"✅ Yetkiler kaydedildi.":"❌ "+(x.error||"Yetki kaydedilemedi.");
+}
 </script></body></html>
