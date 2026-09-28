@@ -669,7 +669,33 @@ class Handler(BaseHTTPRequestHandler):
                 uid=database.create_user(email,hash_password(password),user[1],role)
                 self.send_json(201,{"id":uid,"email":email,"role":role}); return
 
+            if self.path == "/api/users/delete":
+                user=auth_required(self)
+                if not user or user[3] != "owner":
+                    if user: self.send_json(403,{"error":"Sadece işletme sahibi çalışan silebilir."})
+                    return
+                target=int(data.get("user_id",0))
+                if target == user[0]:
+                    self.send_json(400,{"error":"Kendi hesabınızı silemezsiniz."}); return
+                target_user=database.get_user_in_business(user[1],target)
+                if not target_user:
+                    self.send_json(404,{"error":"Çalışan bulunamadı."}); return
+                if target_user[2]=="owner" and database.count_owners(user[1])<=1:
+                    self.send_json(400,{"error":"Son owner hesabı silinemez."}); return
+                database.delete_user(user[1],target)
+                database.write_audit_log(user[1],user[0],"user_deleted","user",target,{"email":target_user[1]})
+                self.send_json(200,{"success":True}); return
+
+            if self.path == "/api/audit":
+                user=auth_required(self)
+                if not user or user[3] != "owner":
+                    if user: self.send_json(403,{"error":"Sadece owner denetim kayıtlarını görebilir."})
+                    return
+                rows=database.list_audit_logs(user[1])
+                self.send_json(200,[{"id":x[0],"user_id":x[1],"action":x[2],"target_type":x[3],"target_id":x[4],"details":x[5],"created_at":x[6].isoformat()} for x in rows]); return
+
             if self.path == "/api/users/permissions":
+
                 user=auth_required(self)
                 if not user: return
                 if user[3] != "owner":
@@ -728,9 +754,3 @@ class Handler(BaseHTTPRequestHandler):
                 if not user_can(user,"appointments"):
                     self.send_json(403,{"error":"Randevu işlemi yapma yetkiniz yok."}); return
                 appointment, error = create_appointment(data, user)
-                if not appointment:
-                    self.send_json(409 if error and "başka bir randevu" in error else 400, {"error": error or "Randevu oluşturulamadı"}); return
-                self.send_json(201, appointment); return
-
-            if self.path == "/api/appointments/status":
-                user=auth_required(self)
