@@ -501,6 +501,23 @@ class Handler(BaseHTTPRequestHandler):
                 result = handle_customer_message(message, str(data.get("channel", "web")).strip() or "web", str(data.get("customer_name", "")).strip(), str(data.get("phone", "")).strip(), user)
                 self.send_json(200, result); return
 
+            if self.path == "/api/users/create":
+                user=auth_required(self)
+                if not user: return
+                if user[3] != "owner":
+                    self.send_json(403,{"error":"Sadece işletme sahibi çalışan ekleyebilir."}); return
+                email=str(data.get("email","")).strip().lower()
+                password=str(data.get("password",""))
+                role=str(data.get("role","staff")).strip()
+                if not email or "@" not in email or len(password) < 8:
+                    self.send_json(400,{"error":"Geçerli e-posta ve en az 8 karakterli şifre gerekli."}); return
+                if role not in {"staff","owner"}:
+                    self.send_json(400,{"error":"Geçersiz rol."}); return
+                if database.get_user_by_email(email):
+                    self.send_json(409,{"error":"Bu e-posta zaten kayıtlı."}); return
+                uid=database.create_user(email,hash_password(password),user[1],role)
+                self.send_json(201,{"id":uid,"email":email,"role":role}); return
+
             if self.path == "/api/users/role":
                 user=auth_required(self)
                 if not user: return
