@@ -130,7 +130,7 @@ loadBusinessSettings();
 async function loadTeam(){
  const r=await fetch("/api/users"); if(!r.ok){document.getElementById("teamList").textContent="Ekip bilgisi alınamadı.";return}
  const users=await r.json();
- document.getElementById("teamList").innerHTML=users.map(u=>'<div style="padding:9px 0;border-bottom:1px solid #edf0f2"><b>'+escapeHtml(u.email)+'</b> <span class="pill">'+escapeHtml(u.role)+'</span></div>').join("");
+ document.getElementById("teamList").innerHTML=users.map(u=>'<div style="padding:12px 0;border-bottom:1px solid #edf0f2"><div style="display:flex;justify-content:space-between;gap:10px;align-items:center"><div><b>'+escapeHtml(u.email)+'</b><div class="muted" style="font-size:12px;margin-top:3px">Hesap aktif • '+escapeHtml(u.role)+'</div></div><span class="pill">'+escapeHtml(u.role)+'</span></div></div>').join("");
 }
 loadTeam();
 document.getElementById("teamForm").addEventListener("submit",async e=>{
