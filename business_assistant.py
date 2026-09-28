@@ -624,6 +624,39 @@ class Handler(BaseHTTPRequestHandler):
 
             data = json.loads(raw_body)
 
+            if self.path == "/webhook/billing":
+                signature=self.headers.get("X-Nexora-Signature","")
+                if not verify_billing_signature(raw_body,signature):
+                    self.send_json(403,{"error":"Ödeme webhook imzası doğrulanamadı."}); return
+                business_id=int(data.get("business_id",0))
+                status=str(data.get("status","")).strip().lower()
+                if business_id <= 0 or status not in {"active","trialing","cancelled","canceled","past_due","unpaid","inactive"}:
+                    self.send_json(400,{"error":"Geçersiz ödeme webhook verisi."}); return
+                database.create_or_update_subscription(business_id,str(data.get("provider","")).strip(),str(data.get("provider_customer_id","")).strip(),str(data.get("provider_subscription_id","")).strip(),status=status,period_start=data.get("current_period_start"),period_end=data.get("current_period_end"),cancel_at_period_end=bool(data.get("cancel_at_period_end",False)))
+                self.send_json(200,{"success":True}); return
+
+            if self.path == "/api/billing/start":
+                user=auth_required(self)
+                if not user: return
+                if user[3] != "owner":
+                    self.send_json(403,{"error":"Sadece işletme sahibi abonelik başlatabilir."}); return
+                checkout=os.environ.get("NEXORA_PAYMENT_URL","").strip()
+                if not checkout:
+                    self.send_json(503,{"error":"Pro ödeme bağlantısı henüz yapılandırılmadı.","setup_required":True}); return
+                self.send_json(200,{"checkout_url":checkout,"provider":os.environ.get("NEXORA_PAYMENT_PROVIDER","").strip()}); return
+
+            if self.path == "/api/billing/cancel":
+                user=auth_required(self)
+                if not user: return
+                if user[3] != "owner":
+                    self.send_json(403,{"error":"Sadece işletme sahibi aboneliği yönetebilir."}); return
+                record=database.get_subscription_record(user[1])
+                if not record:
+                    self.send_json(404,{"error":"Aktif abonelik bulunamadı."}); return
+                database.update_subscription_status(user[1],"cancelled",cancel_at_period_end=True,period_end=record.get("current_period_end"))
+                database.write_audit_log(user[1],user[0],"subscription_cancelled","subscription",record.get("id"),{"provider":record.get("provider","")})
+                self.send_json(200,{"success":True}); return
+
             if self.path == "/api/auth/register":
                 client_key=self.client_address[0] if self.client_address else "unknown"
                 if rate_limited("register:"+client_key, REGISTER_RATE_LIMIT, REGISTER_RATE_WINDOW):
