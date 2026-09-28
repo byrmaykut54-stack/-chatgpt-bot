@@ -4,7 +4,7 @@ import json
 import os
 import re
 import urllib.request
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import parse_qs, urlparse
 
@@ -487,6 +487,58 @@ class Handler(BaseHTTPRequestHandler):
                 return
 
             data = json.loads(raw_body)
+
+            if self.path == "/api/auth/register":
+                email=str(data.get("email","")).strip().lower()
+                password=str(data.get("password",""))
+                business_name=str(data.get("business_name","")).strip()
+                if not email or "@" not in email or len(password) < 8 or not business_name:
+                    self.send_json(400,{"error":"İşletme adı, geçerli e-posta ve en az 8 karakterli şifre gerekli."}); return
+                if not database_enabled():
+                    self.send_json(503,{"error":"Veritabanı hazır değil."}); return
+                if database.get_user_by_email(email):
+                    self.send_json(409,{"error":"Bu e-posta zaten kayıtlı. Giriş yapmayı deneyin."}); return
+                config=dict(DEFAULT_CONFIG)
+                config["business_name"]=business_name
+                business_id=database.create_business(business_name,config)
+                user_id=database.create_user(email,hash_password(password),business_id,"owner")
+                token=os.urandom(32).hex()
+                expires=(datetime.now(timezone.utc)+timedelta(days=30)).isoformat()
+                database.create_session(hashlib.sha256(token.encode("utf-8")).hexdigest(),user_id,expires)
+                self.send_response(201)
+                self.send_header("Set-Cookie","session="+token+"; HttpOnly; SameSite=Lax; Path=/; Max-Age=2592000")
+                self.send_header("Content-Type","application/json; charset=utf-8")
+                body=json.dumps({"success":True,"email":email},ensure_ascii=False).encode("utf-8")
+                self.send_header("Content-Length",str(len(body))); self.end_headers(); self.wfile.write(body); return
+
+            if self.path == "/api/auth/login":
+                email=str(data.get("email","")).strip().lower()
+                password=str(data.get("password",""))
+                if not email or not password:
+                    self.send_json(400,{"error":"E-posta ve şifre gerekli."}); return
+                if not database_enabled():
+                    self.send_json(503,{"error":"Veritabanı hazır değil."}); return
+                user=database.get_user_by_email(email)
+                if not user or not verify_password(password,user[3]):
+                    self.send_json(401,{"error":"E-posta veya şifre hatalı."}); return
+                token=os.urandom(32).hex()
+                expires=(datetime.now(timezone.utc)+timedelta(days=30)).isoformat()
+                database.create_session(hashlib.sha256(token.encode("utf-8")).hexdigest(),user[0],expires)
+                self.send_response(200)
+                self.send_header("Set-Cookie","session="+token+"; HttpOnly; SameSite=Lax; Path=/; Max-Age=2592000")
+                self.send_header("Content-Type","application/json; charset=utf-8")
+                body=json.dumps({"success":True,"email":user[2]},ensure_ascii=False).encode("utf-8")
+                self.send_header("Content-Length",str(len(body))); self.end_headers(); self.wfile.write(body); return
+
+            if self.path == "/api/auth/logout":
+                token=cookie_token(self)
+                if token and database_enabled():
+                    database.delete_session(hashlib.sha256(token.encode("utf-8")).hexdigest())
+                self.send_response(200)
+                self.send_header("Set-Cookie","session=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0")
+                self.send_header("Content-Type","application/json; charset=utf-8")
+                body=b'{"success":true}'
+                self.send_header("Content-Length",str(len(body))); self.end_headers(); self.wfile.write(body); return
 
             if self.path == "/webhook/whatsapp":
                 incoming = parse_whatsapp_message(data)
