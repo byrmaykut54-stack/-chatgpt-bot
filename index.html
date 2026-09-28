@@ -48,7 +48,12 @@ input{width:100%;padding:11px;border:1px solid #dfe4e8;border-radius:9px;margin:
 <div class="card"><h2>⏳ Bekleyen Randevular</h2><div id="pendingAppointments" class="muted">Yükleniyor...</div></div>
 <div class="card"><h2>👥 Müşteri Listesi</h2><div id="customers" class="muted">Yükleniyor...</div></div>
 </main><aside>
-<div class="card"><h2>👤 Ekip & Yetkiler</h2><div id="teamList" class="muted">Yükleniyor...</div></div><div class="card"><h2>⚙️ İşletme Ayarları</h2><form id="businessForm">
+<div class="card"><h2>👤 Ekip & Yetkiler</h2>
+<form id="teamForm">
+<input id="teamEmail" type="email" placeholder="Çalışan e-postası" required>
+<input id="teamPassword" type="password" placeholder="Geçici şifre (en az 8 karakter)" minlength="8" required>
+<button class="primary full">Çalışan Hesabı Oluştur</button>
+</form><div id="teamStatus" class="muted" style="margin:8px 0"></div><div id="teamList" class="muted">Yükleniyor...</div></div><div class="card"><h2>⚙️ İşletme Ayarları</h2><form id="businessForm">
 <input id="cfgName" placeholder="İşletme adı" required><input id="cfgSector" placeholder="Sektör" required>
 <input id="cfgHours" placeholder="Çalışma saatleri: 09:00-18:00" required><input id="cfgAddress" placeholder="Adres">
 <input id="cfgClosed" placeholder="Kapalı günler: Pazar">
@@ -120,6 +125,14 @@ async function loadTeam(){
  document.getElementById("teamList").innerHTML=users.map(u=>'<div style="padding:9px 0;border-bottom:1px solid #edf0f2"><b>'+escapeHtml(u.email)+'</b> <span class="pill">'+escapeHtml(u.role)+'</span></div>').join("");
 }
 loadTeam();
+document.getElementById("teamForm").addEventListener("submit",async e=>{
+ e.preventDefault();
+ const r=await fetch("/api/users/create",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:document.getElementById("teamEmail").value,password:document.getElementById("teamPassword").value,role:"staff"})});
+ const x=await r.json().catch(()=>({}));
+ document.getElementById("teamStatus").textContent=r.ok?"✅ Çalışan hesabı oluşturuldu.":"❌ "+(x.error||"Hesap oluşturulamadı.");
+ if(r.ok){e.target.reset();loadTeam();}
+});
+
 
 
 </script></body></html>
