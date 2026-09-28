@@ -60,6 +60,39 @@ def load_config():
 def database_enabled():
     return bool(database and database.enabled())
 
+def hash_password(password):
+    salt = os.urandom(16)
+    derived = hashlib.scrypt(password.encode("utf-8"), salt=salt, n=16384, r=8, p=1)
+    return "scrypt$16384$8$1$" + salt.hex() + "$" + derived.hex()
+
+def verify_password(password, stored):
+    try:
+        _, n, r, pp, salt_hex, digest_hex = stored.split("$")
+        derived = hashlib.scrypt(password.encode("utf-8"), salt=bytes.fromhex(salt_hex), n=int(n), r=int(r), p=int(pp))
+        return hmac.compare_digest(derived.hex(), digest_hex)
+    except Exception:
+        return False
+
+def cookie_token(handler):
+    for part in handler.headers.get("Cookie", "").split(";"):
+        if part.strip().startswith("session="): return part.strip().split("=", 1)[1]
+    return ""
+
+def current_user(handler):
+    if not database_enabled(): return None
+    token = cookie_token(handler)
+    return database.get_session_user(hashlib.sha256(token.encode("utf-8")).hexdigest()) if token else None
+
+def auth_required(handler):
+    user = current_user(handler)
+    if not user: handler.send_json(401, {"error":"Giriş yapmanız gerekiyor."}); return None
+    return user
+
+def business_config_for_user(user):
+    value = user[5]
+    return json.loads(value) if isinstance(value, str) else value
+
+
 def initialize_database():
     if database_enabled():
         database.ensure_schema()
@@ -405,11 +438,21 @@ class Handler(BaseHTTPRequestHandler):
             except FileNotFoundError:
                 self.send_json(404, {"error": "index.html bulunamadı"})
             return
+        if parsed.path == "/api/auth/status":
+            user=current_user(self); self.send_json(200,{"authenticated":bool(user),"email":user[2] if user else ""}); return
+        if parsed.path == "/api/auth/setup-available":
+            self.send_json(200,{"available":database_enabled() and database.count_users()==0}); return
         if parsed.path == "/api/business":
-            self.send_json(200, load_config()); return
+            user=auth_required(self)
+            if not user: return
+            self.send_json(200, business_config_for_user(user)); return
         if parsed.path == "/api/appointments":
+            user=auth_required(self)
+            if not user: return
             self.send_json(200, load_appointments()); return
         if parsed.path == "/api/messages":
+            user=auth_required(self)
+            if not user: return
             self.send_json(200, load_messages()); return
         if parsed.path == "/health":
             self.send_json(200, {"status": "ok", "service": "AI İşletme Asistanı"}); return
@@ -451,12 +494,16 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(200, result); return
 
             if self.path == "/api/appointments":
+                user=auth_required(self)
+                if not user: return
                 appointment, error = create_appointment(data)
                 if not appointment:
                     self.send_json(409 if error and "başka bir randevu" in error else 400, {"error": error or "Randevu oluşturulamadı"}); return
                 self.send_json(201, appointment); return
 
             if self.path == "/api/appointments/status":
+                user=auth_required(self)
+                if not user: return
                 appointment_id = str(data.get("id", "")).strip()
                 status = str(data.get("status", "")).strip()
                 if status not in {"pending", "confirmed", "cancelled", "completed"}:
