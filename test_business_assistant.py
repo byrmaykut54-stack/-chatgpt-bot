@@ -80,5 +80,35 @@ class BusinessAssistantTests(unittest.TestCase):
             )
 
 
+    def test_password_hash_and_verify(self):
+        hashed = business_assistant.hash_password("NexoraTest123!")
+        self.assertTrue(business_assistant.verify_password("NexoraTest123!", hashed))
+        self.assertFalse(business_assistant.verify_password("wrong-password", hashed))
+
+    def test_free_slots_do_not_expose_past_hours_today(self):
+        config = {**business_assistant.DEFAULT_CONFIG, "working_hours": "09:00-18:00", "closed_days": []}
+        with patch.object(business_assistant, "is_time_available", return_value=True):
+            with patch("business_assistant.datetime") as dt:
+                dt.now.return_value = type("D", (), {"hour": 14, "minute": 30})()
+                dt.strptime = __import__("datetime").datetime.strptime
+                slots = business_assistant.get_free_slots("2026-10-01", config)
+        self.assertNotIn("14:00", slots)
+        self.assertIn("15:00", slots)
+
+    def test_tenant_scoped_save_load_contract(self):
+        class FakeDatabase:
+            def enabled(self): return True
+            def load_appointments_by_business(self, business_id):
+                return [{"id": str(business_id)}]
+            def load_messages_by_business(self, business_id):
+                return [{"id": str(business_id)}]
+        fake = FakeDatabase()
+        with patch.object(business_assistant, "database", fake):
+            self.assertEqual(business_assistant.load_appointments((1, 10))[0]["id"], "10")
+            self.assertEqual(business_assistant.load_appointments((1, 20))[0]["id"], "20")
+            self.assertEqual(business_assistant.load_messages((1, 10))[0]["id"], "10")
+            self.assertEqual(business_assistant.load_messages((1, 20))[0]["id"], "20")
+
+
 if __name__ == "__main__":
     unittest.main()
