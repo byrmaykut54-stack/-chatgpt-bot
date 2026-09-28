@@ -113,25 +113,25 @@ def initialize_database():
         if not current_messages and legacy_messages:
             database.save_messages(config, legacy_messages)
 
-def load_appointments():
+def load_appointments(user=None):
     if database_enabled():
-        return database.load_appointments(load_config())
+        return database.load_appointments_by_business(user[1]) if user else database.load_appointments(load_config())
     return load_json(APPOINTMENTS_PATH, [])
 
-def save_appointments(items):
+def save_appointments(items, user=None):
     if database_enabled():
-        database.save_appointments(load_config(), items)
+        database.save_appointments_by_business(user[1], items) if user else database.save_appointments(load_config(), items)
     else:
         save_json(APPOINTMENTS_PATH, items)
 
-def load_messages():
+def load_messages(user=None):
     if database_enabled():
-        return database.load_messages(load_config())
+        return database.load_messages_by_business(user[1]) if user else database.load_messages(load_config())
     return load_json(MESSAGES_PATH, [])
 
-def save_messages(items):
+def save_messages(items, user=None):
     if database_enabled():
-        database.save_messages(load_config(), items)
+        database.save_messages_by_business(user[1], items) if user else database.save_messages(load_config(), items)
     else:
         save_json(MESSAGES_PATH, items)
 
@@ -187,7 +187,7 @@ MESAJ:
     except Exception:
         return {"intent": "other", "customer_name": "", "phone": "", "date": "", "time": "", "service": "", "note": ""}
 
-def create_appointment(data):
+def create_appointment(data, user=None):
     appointment = {
         "id": datetime.utcnow().strftime("%Y%m%d%H%M%S%f"),
         "customer_name": str(data.get("customer_name", "")).strip(),
@@ -203,14 +203,14 @@ def create_appointment(data):
     if any(not appointment[x] for x in required):
         return None, "customer_name, phone, date, time ve service zorunlu"
 
-    items = load_appointments()
+    items = load_appointments(user)
     active = {"pending", "confirmed"}
     conflict = next((item for item in items if item.get("date") == appointment["date"] and item.get("time") == appointment["time"] and item.get("status") in active), None)
     if conflict:
         return None, "Bu tarih ve saatte başka bir randevu bulunuyor."
 
     items.append(appointment)
-    save_appointments(items)
+    save_appointments(items, user)
     return appointment, None
 
 def appointment_time_from_text(text):
@@ -262,7 +262,7 @@ def is_closed_day(date, config):
         return False
     return day_name in {str(day).strip() for day in config.get("closed_days", [])}
 
-def is_time_available(date, time, config=None):
+def is_time_available(date, time, config=None, user=None):
     if not date or not time:
         return None
     config = config or load_config()
@@ -280,7 +280,7 @@ def is_time_available(date, time, config=None):
         return False
     if requested < start or requested >= end:
         return False
-    items = load_appointments()
+    items = load_appointments(user)
     active = {"pending", "confirmed"}
     return not any(item.get("date") == date and item.get("time") == time and item.get("status") in active for item in items)
 
@@ -295,8 +295,8 @@ def get_free_slots(date, config):
     end = int(match.group(3))
     return [f"{hour:02d}:00" for hour in range(start, end) if is_time_available(date, f"{hour:02d}:00", config)]
 
-def handle_customer_message(message, channel="web", customer_name="", phone=""):
-    config = load_config()
+def handle_customer_message(message, channel="web", customer_name="", phone="", user=None):
+    config = business_config_for_user(user) if user else load_config()
     hint = local_intent_hint(message, config)
     intent = hint if hint else detect_appointment_intent(message, config)
     record = {
@@ -309,9 +309,9 @@ def handle_customer_message(message, channel="web", customer_name="", phone=""):
         "intent": intent.get("intent", "other"),
         "created_at": datetime.utcnow().isoformat() + "Z"
     }
-    messages = load_messages()
+    messages = load_messages(user)
     messages.append(record)
-    save_messages(messages)
+    save_messages(messages, user)
 
     if intent.get("intent") == "price":
         return {"reply": f"{intent.get('service')} fiyatı {intent.get('price')}."}
@@ -343,7 +343,7 @@ def handle_customer_message(message, channel="web", customer_name="", phone=""):
                 return {"reply": "Pazar günü işletme kapalı. Lütfen başka bir gün seçer misiniz?"}
             if not is_time_available(intent["date"], intent["time"], config):
                 return {"reply": "Seçtiğiniz tarih veya saat uygun değil. Çalışma saatleri 09:00-18:00, Pazar günleri tatil."}
-            appointment, error = create_appointment(intent)
+            appointment, error = create_appointment(intent, user)
             if appointment:
                 return {"reply": f"Randevunuzu aldım. {appointment['date']} {appointment['time']} için {appointment['service']} kaydınız oluşturuldu.", "appointment": appointment}
             if error == "Bu tarih ve saatte başka bir randevu bulunuyor.":
@@ -487,22 +487,35 @@ class Handler(BaseHTTPRequestHandler):
                 if not ok:
                     out["reply_error"] = send_result
                 else:
-                    messages = load_messages()
+                    messages = load_messages(user)
                     messages.append({"id": datetime.utcnow().strftime("%Y%m%d%H%M%S%f"), "message_id": incoming.get("message_id", ""), "channel": "whatsapp", "direction": "outbound", "customer_name": incoming["customer_name"], "phone": incoming["phone"], "message": result["reply"], "intent": "ai_reply", "created_at": datetime.utcnow().isoformat() + "Z"})
-                    save_messages(messages)
+                    save_messages(messages, user)
                 self.send_json(200, out); return
 
             if self.path in ("/chat", "/webhook/message"):
+                user=auth_required(self)
+                if not user: return
                 message = str(data.get("message", "")).strip()
                 if not message:
                     self.send_json(400, {"error": "message alanı gerekli"}); return
-                result = handle_customer_message(message, str(data.get("channel", "web")).strip() or "web", str(data.get("customer_name", "")).strip(), str(data.get("phone", "")).strip())
+                result = handle_customer_message(message, str(data.get("channel", "web")).strip() or "web", str(data.get("customer_name", "")).strip(), str(data.get("phone", "")).strip(), user)
                 self.send_json(200, result); return
+
+            if self.path == "/api/business":
+                user=auth_required(self)
+                if not user: return
+                name=str(data.get("business_name","")).strip()
+                config=data.get("config") if isinstance(data.get("config"),dict) else data
+                if name: config["business_name"]=name
+                if not str(config.get("business_name","")).strip():
+                    self.send_json(400,{"error":"İşletme adı gerekli"}); return
+                database.update_business(user[1], str(config["business_name"]), config)
+                self.send_json(200, config); return
 
             if self.path == "/api/appointments":
                 user=auth_required(self)
                 if not user: return
-                appointment, error = create_appointment(data)
+                appointment, error = create_appointment(data, user)
                 if not appointment:
                     self.send_json(409 if error and "başka bir randevu" in error else 400, {"error": error or "Randevu oluşturulamadı"}); return
                 self.send_json(201, appointment); return
@@ -514,11 +527,11 @@ class Handler(BaseHTTPRequestHandler):
                 status = str(data.get("status", "")).strip()
                 if status not in {"pending", "confirmed", "cancelled", "completed"}:
                     self.send_json(400, {"error": "Geçersiz durum"}); return
-                items = load_appointments()
+                items = load_appointments(user)
                 for item in items:
                     if item["id"] == appointment_id:
                         item["status"] = status
-                        save_appointments(items)
+                        save_appointments(items, user)
                         self.send_json(200, {"success": True}); return
                 self.send_json(404, {"error": "Randevu bulunamadı"}); return
 
