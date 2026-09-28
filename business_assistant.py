@@ -122,6 +122,12 @@ def current_user(handler):
     return database.get_session_user(hashlib.sha256(token.encode("utf-8")).hexdigest()) if token else None
 
 def rate_limited(key, limit=RATE_LIMIT_MAX, window=RATE_LIMIT_WINDOW):
+    if database_enabled():
+        try:
+            return database.shared_rate_limited(key, limit, window)
+        except Exception:
+            # Fail closed for abuse controls if the shared limiter is unavailable.
+            return True
     now = datetime.now(timezone.utc).timestamp()
     values = [x for x in RATE_LIMITS[key] if now - x < window]
     if len(values) >= limit:
@@ -1122,3 +1128,4 @@ if __name__ == "__main__":
     port=int(os.environ.get("PORT","8080"))
     print(f"AI İşletme Asistanı: http://0.0.0.0:{port}")
     HTTPServer(("0.0.0.0",port),Handler).serve_forever()
+
