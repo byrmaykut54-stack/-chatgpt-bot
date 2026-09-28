@@ -35,6 +35,9 @@ DEFAULT_CONFIG = {
 RATE_LIMITS = defaultdict(list)
 RATE_LIMIT_WINDOW = 60
 RATE_LIMIT_MAX = 20
+REGISTER_RATE_LIMIT = 3
+REGISTER_RATE_WINDOW = 3600
+MAX_BODY_BYTES = 256 * 1024
 
 SYSTEM_PROMPT = """Sen bir küçük işletme müşteri iletişim asistanısın.
 İşletmenin verdiği bilgilere sadık kal. Bilgi yoksa uydurma.
@@ -101,7 +104,17 @@ def rate_limited(key, limit=RATE_LIMIT_MAX, window=RATE_LIMIT_WINDOW):
 
 def auth_required(handler):
     user = current_user(handler)
-    if not user: handler.send_json(401, {"error":"Giriş yapmanız gerekiyor."}); return None
+    if not user:
+        handler.send_json(401, {"error":"Giriş yapmanız gerekiyor."})
+        return None
+    if database_enabled():
+        subscription = database.get_business_subscription(user[1])
+        if subscription["status"] != "active":
+            handler.send_json(403, {"error":"İşletme hesabı aktif değil."})
+            return None
+        if subscription["plan"] == "trial" and not subscription["trial_active"]:
+            handler.send_json(402, {"error":"Deneme süreniz sona erdi. Devam etmek için Pro planına geçin."})
+            return None
     return user
 
 def user_can(user, module):
@@ -489,6 +502,7 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Vary", "Origin")
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Credentials", "true")
         self.end_headers()
 
 
@@ -515,9 +529,15 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(404, {"error": "index.html bulunamadı"})
             return
         if parsed.path == "/api/auth/status":
-            user=current_user(self); self.send_json(200,{"authenticated":bool(user),"email":user[2] if user else ""}); return
+            user=current_user(self)
+            payload={"authenticated":bool(user),"email":user[2] if user else ""}
+            if user and database_enabled():
+                payload["subscription"]=database.get_business_subscription(user[1])
+            self.send_json(200,payload); return
         if parsed.path == "/api/auth/setup-available":
             self.send_json(200,{"available":database_enabled() and database.count_users()==0}); return
+        if parsed.path == "/api/plans":
+            self.send_json(200,{"plans":[{"id":"trial","name":"14 Gün Deneme","price":0,"features":["Randevu yönetimi","Müşteri yönetimi","AI müşteri asistanı","Ekip ve yetkiler"]},{"id":"pro","name":"NEXORA Pro","price":0,"price_note":"Fiyatlandırma bağlantısı hazırlanıyor","features":["Tüm deneme özellikleri","WhatsApp entegrasyonu","Gelişmiş raporlar","Öncelikli destek"]}]}); return
         if parsed.path == "/api/business":
             user=auth_required(self)
             if not user: return
@@ -573,6 +593,9 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         try:
             length = int(self.headers.get("Content-Length", "0"))
+            if length < 0 or length > MAX_BODY_BYTES:
+                self.send_json(413, {"error":"İstek gövdesi çok büyük."})
+                return
             raw_body = self.rfile.read(length) or b"{}"
 
             if self.path == "/webhook/whatsapp" and not verify_whatsapp_signature(raw_body, self.headers.get("X-Hub-Signature-256", "")):
@@ -582,9 +605,14 @@ class Handler(BaseHTTPRequestHandler):
             data = json.loads(raw_body)
 
             if self.path == "/api/auth/register":
+                client_key=self.client_address[0] if self.client_address else "unknown"
+                if rate_limited("register:"+client_key, REGISTER_RATE_LIMIT, REGISTER_RATE_WINDOW):
+                    self.send_json(429,{"error":"Çok fazla kayıt denemesi. Lütfen daha sonra tekrar deneyin."}); return
                 email=str(data.get("email","")).strip().lower()
                 password=str(data.get("password",""))
                 business_name=str(data.get("business_name","")).strip()
+                if len(email) > 254 or len(password) > 128 or len(business_name) > 120:
+                    self.send_json(400,{"error":"Girilen bilgiler izin verilen uzunluğu aşıyor."}); return
                 if not email or "@" not in email or len(password) < 8 or not business_name:
                     self.send_json(400,{"error":"İşletme adı, geçerli e-posta ve en az 8 karakterli şifre gerekli."}); return
                 if not database_enabled():
