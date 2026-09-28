@@ -74,7 +74,7 @@ CREATE TABLE IF NOT EXISTS sessions (
     id BIGSERIAL PRIMARY KEY,
     token_hash TEXT PRIMARY KEY,
     user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    expires_at TIMESTAMPTZ NOT NULL,
+    expires_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -97,6 +97,7 @@ def ensure_schema():
     with connection() as conn:
         conn.execute(SCHEMA)
         conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS permissions JSONB NOT NULL DEFAULT '{}'::jsonb")
+        conn.execute("ALTER TABLE sessions ALTER COLUMN expires_at DROP NOT NULL")
         conn.commit()
 
 def create_business(name, config):
@@ -149,7 +150,7 @@ def create_session(token_hash, user_id, expires_at):
 
 def get_session_user(token_hash):
     with connection() as conn:
-        return conn.execute("SELECT u.id,u.business_id,u.email,u.role,b.name,b.config FROM sessions s JOIN users u ON u.id=s.user_id JOIN businesses b ON b.id=u.business_id WHERE s.token_hash=%s AND s.expires_at>NOW() LIMIT 1", (token_hash,)).fetchone()
+        return conn.execute("SELECT u.id,u.business_id,u.email,u.role,b.name,b.config FROM sessions s JOIN users u ON u.id=s.user_id JOIN businesses b ON b.id=u.business_id WHERE s.token_hash=%s AND (s.expires_at IS NULL OR s.expires_at>NOW()) LIMIT 1", (token_hash,)).fetchone()
 
 def delete_session(token_hash):
     with connection() as conn:
