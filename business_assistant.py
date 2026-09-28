@@ -626,6 +626,11 @@ class Handler(BaseHTTPRequestHandler):
                 permissions={k:bool(incoming.get(k,False)) for k in allowed}
                 if target == user[0]:
                     self.send_json(400,{"error":"Kendi owner yetkilerinizi bu ekrandan değiştirmeyin."}); return
+                target_user=database.get_user_in_business(user[1],target)
+                if not target_user:
+                    self.send_json(404,{"error":"Çalışan bulunamadı"}); return
+                if target_user[2] == "owner":
+                    self.send_json(400,{"error":"Owner hesabının yetkileri değiştirilemez."}); return
                 if not database.update_user_permissions(user[1],target,permissions):
                     self.send_json(404,{"error":"Çalışan bulunamadı"}); return
                 self.send_json(200,{"success":True,"permissions":permissions}); return
