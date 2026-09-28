@@ -728,7 +728,6 @@ class Handler(BaseHTTPRequestHandler):
             csrf_exempt = {
                 "/api/auth/register",
                 "/api/auth/login",
-                "/api/auth/logout",
                 "/webhook/whatsapp",
                 "/webhook/iyzico/subscription",
                 "/webhook/billing",
