@@ -63,6 +63,10 @@ input{width:100%;padding:12px 13px;border:1px solid #e0e5ea;background:#fbfcfd;b
 <input id="cfgHours" placeholder="Çalışma saatleri: 09:00-18:00" required><input id="cfgAddress" placeholder="Adres">
 <input id="cfgClosed" placeholder="Kapalı günler: Pazar">
 <input id="cfgTone" placeholder="Yanıt tonu: samimi, kısa ve profesyonel">
+<div style="margin:12px 0 6px;font-size:11px;font-weight:800;letter-spacing:.08em;color:#8a929d">WHATSAPP BAĞLANTISI</div>
+<input id="cfgWhatsappPhoneId" placeholder="Phone Number ID">
+<input id="cfgWhatsappToken" type="password" placeholder="WhatsApp Access Token (kaydedilen token gizli tutulur)" autocomplete="off">
+<div id="cfgWhatsappStatus" class="muted" style="font-size:11px;margin:-2px 0 10px">Bağlantı kontrol ediliyor...</div>
 <textarea id="cfgServices" placeholder="Hizmetler: Saç Kesimi=500 TL, Saç + Sakal=750 TL" style="width:100%;min-height:80px;padding:11px;border:1px solid #dfe4e8;border-radius:9px;margin:5px 0 10px;font:inherit"></textarea>
 <button class="primary full">Ayarları Kaydet</button></form><div id="cfgStatus" class="muted" style="margin-top:8px"></div></div>
 <div class="card"><h2>💬 AI Müşteri Asistanı</h2><div id="chat" class="chat"></div><form id="chatForm" class="chatform"><input id="message" placeholder="Müşteri mesajını test et..." autocomplete="off"><button class="primary">Gönder</button></form></div>
@@ -129,13 +133,19 @@ async function loadBusinessSettings(){
  document.getElementById("cfgName").value=b.business_name||""; document.getElementById("cfgSector").value=b.sector||"";
  document.getElementById("cfgHours").value=b.working_hours||""; document.getElementById("cfgAddress").value=b.address||"";
  document.getElementById("cfgClosed").value=(b.closed_days||[]).join(", "); document.getElementById("cfgTone").value=b.tone||"";
+ document.getElementById("cfgWhatsappPhoneId").value=b.whatsapp_phone_number_id||"";
+ document.getElementById("cfgWhatsappToken").value="";
+ document.getElementById("cfgWhatsappStatus").textContent=b.whatsapp_connected?"🟢 WhatsApp bağlantısı aktif. Token değiştirmek istemiyorsanız boş bırakın.":"⚪ WhatsApp bağlı değil.";
  document.getElementById("cfgServices").value=(b.services||[]).map(x=>x.name+"="+x.price).join(", ");
 }
 businessForm.addEventListener("submit",async e=>{e.preventDefault();
  const services=document.getElementById("cfgServices").value.split(",").map(x=>x.trim()).filter(Boolean).map(x=>{const i=x.lastIndexOf("=");return i>0?{name:x.slice(0,i).trim(),price:x.slice(i+1).trim()}:{name:x,price:""}});
  const config={business_name:document.getElementById("cfgName").value.trim(),sector:document.getElementById("cfgSector").value.trim(),working_hours:document.getElementById("cfgHours").value.trim(),address:document.getElementById("cfgAddress").value.trim(),closed_days:document.getElementById("cfgClosed").value.split(",").map(x=>x.trim()).filter(Boolean),tone:document.getElementById("cfgTone").value.trim(),services};
- const r=await fetch("/api/business",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({business_name:config.business_name,config})});
- document.getElementById("cfgStatus").textContent=r.ok?"✅ İşletme ayarları kaydedildi.":"❌ Ayarlar kaydedilemedi."; if(r.ok){document.getElementById("business").textContent=config.business_name+" • "+config.sector+" • "+config.working_hours;}
+ const phoneId=document.getElementById("cfgWhatsappPhoneId").value.trim(); const token=document.getElementById("cfgWhatsappToken").value.trim();
+ const payload={business_name:config.business_name,config,whatsapp_phone_number_id:phoneId}; if(token)payload.whatsapp_access_token=token;
+ const r=await fetch("/api/business",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
+ const saved=await r.json().catch(()=>({}));
+ document.getElementById("cfgStatus").textContent=r.ok?"✅ İşletme ayarları kaydedildi.":"❌ "+(saved.error||"Ayarlar kaydedilemedi."); if(r.ok){document.getElementById("business").textContent=config.business_name+" • "+config.sector+" • "+config.working_hours; document.getElementById("cfgWhatsappToken").value=""; document.getElementById("cfgWhatsappStatus").textContent=saved.whatsapp_connected?"🟢 WhatsApp bağlantısı aktif.":"⚪ WhatsApp bağlı değil.";}
 });
 loadBusinessSettings();
 async function loadTeam(){
