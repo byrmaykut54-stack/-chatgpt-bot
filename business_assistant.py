@@ -94,6 +94,13 @@ def auth_required(handler):
     if not user: handler.send_json(401, {"error":"Giriş yapmanız gerekiyor."}); return None
     return user
 
+def user_can(user, module):
+    if not user or not database_enabled(): return False
+    if user[3] == 'owner': return True
+    permissions = database.get_user_permissions(user[0]) or {}
+    return bool(permissions.get(module, False))
+
+
 def business_config_for_user(user):
     value = user[5]
     return json.loads(value) if isinstance(value, str) else value
