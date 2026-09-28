@@ -2,6 +2,7 @@ import hashlib
 import hmac
 import json
 import os
+import re
 import urllib.request
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -135,24 +136,35 @@ def create_appointment(data):
     save_appointments(items)
     return appointment, None
 
+def appointment_time_from_text(text):
+    match = re.search(r"\b([01]?\d|2[0-3])(?:[:.]([0-5]\d))?\b", text)
+    if not match:
+        return ""
+    hour = int(match.group(1))
+    minute = int(match.group(2) or "00")
+    return f"{hour:02d}:{minute:02d}"
+
 def local_intent_hint(message, config):
     text = message.lower()
-    appointment_words = ("randevu", "rezervasyon", "uygun saat", "saat")
+    time_text = appointment_time_from_text(text)
+    appointment_words = ("randevu", "rezervasyon", "uygun saat", "saat", "boş mu", "boş", "müsait", "uygun")
     if any(word in text for word in appointment_words):
-        import re
-        time_match = re.search(r"\b([01]?\d|2[0-3])[:.]([0-5]\d)\b", text)
         service = ""
         for item in config.get("services", []):
             name = str(item.get("name", "")).strip()
             if name and name.lower() in text:
                 service = name
                 break
+
+        # "Saat 3 boş mu?" gibi sorularda tarihi açıkça verilmemişse bugün varsayılır.
+        today = datetime.now().strftime("%Y-%m-%d") if time_text and any(word in text for word in ("boş", "müsait", "uygun")) else ""
+
         return {
-            "intent": "appointment",
+            "intent": "availability" if any(word in text for word in ("boş", "müsait", "uygun")) else "appointment",
             "customer_name": "",
             "phone": "",
-            "date": "",
-            "time": f"{int(time_match.group(1)):02d}:{time_match.group(2)}" if time_match else "",
+            "date": today,
+            "time": time_text,
             "service": service,
             "note": ""
         }
@@ -166,6 +178,13 @@ def local_intent_hint(message, config):
         ) and any(word in text for word in ("fiyat", "ne kadar", "ücret", "kaç tl")):
             return {"intent": "price", "service": name, "price": price}
     return None
+
+def is_time_available(date, time):
+    if not date or not time:
+        return None
+    items = load_appointments()
+    active = {"pending", "confirmed"}
+    return not any(item.get("date") == date and item.get("time") == time and item.get("status") in active for item in items)
 
 def handle_customer_message(message, channel="web", customer_name="", phone=""):
     config = load_config()
@@ -187,6 +206,18 @@ def handle_customer_message(message, channel="web", customer_name="", phone=""):
 
     if intent.get("intent") == "price":
         return {"reply": f"{intent.get('service')} fiyatı {intent.get('price')}."}
+
+    if intent.get("intent") == "availability":
+        date = intent.get("date", "")
+        time = intent.get("time", "")
+        if not date:
+            return {"reply": "Boş saatleri kontrol edebilmem için hangi tarih için baktığınızı yazar mısınız?"}
+        if not time:
+            return {"reply": f"{date} için randevu saatlerini kontrol edebilirim. Hangi saat aralığına bakmamı istersiniz?"}
+        available = is_time_available(date, time)
+        if available:
+            return {"reply": f"Evet, {date} günü saat {time} şu an boş görünüyor."}
+        return {"reply": f"Maalesef {date} günü saat {time} dolu görünüyor. Başka bir saat seçebilirsiniz."}
 
     if intent.get("intent") == "appointment":
         intent["customer_name"] = record["customer_name"]
