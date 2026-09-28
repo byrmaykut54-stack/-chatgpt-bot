@@ -46,12 +46,14 @@ input{width:100%;padding:12px 13px;border:1px solid #e0e5ea;background:#fbfcfd;b
 <div class="card"><div class="label">ONAYLANAN</div><div class="stat" id="confirmedCount">0</div></div>
 <div class="card"><div class="label">MÜŞTERİLER</div><div class="stat" id="customerCount">0</div></div>
 <div class="card"><div class="label">MESAJLAR</div><div class="stat" id="messageCount">0</div></div><div class="card"><div class="label">ABONELİK</div><div class="stat" id="subscriptionPlan">TRIAL</div><div id="subscriptionInfo" class="muted" style="font-size:11px;margin-top:5px"></div><button id="proBtn" class="primary full" style="margin-top:10px">Pro'ya Geç</button></div>
+<div class="card"><div class="label">KULLANIM</div><div id="usageInfo" class="muted" style="font-size:12px;margin-top:8px">Yükleniyor...</div></div>
 </div>
 <div class="layout"><main>
 <div class="card"><h2>📥 Müşteri Mesajları</h2><div id="messages" class="muted">Yükleniyor...</div></div>
 <div class="card"><h2>📅 Bugünün Randevuları</h2><div id="todayAppointments" class="muted">Yükleniyor...</div></div>
 <div class="card"><h2>⏳ Bekleyen Randevular</h2><div id="pendingAppointments" class="muted">Yükleniyor...</div></div>
 <div class="card"><h2>👥 Müşteri Listesi</h2><div id="customers" class="muted">Yükleniyor...</div></div>
+<div class="card"><h2>🛡️ Denetim Kayıtları</h2><div id="auditLogs" class="muted">Yalnızca işletme sahibi görebilir.</div></div>
 </main><aside>
 <div class="card"><h2>👤 Ekip & Yetkiler</h2>
 <form id="teamForm">
@@ -81,6 +83,17 @@ function badge(status){const l={pending:"Bekliyor",confirmed:"Onaylandı",cancel
 async function setStatus(id,status){const r=await fetch("/api/appointments/status",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id,status})});if(!r.ok){alert("Durum güncellenemedi.");return}loadDashboard();}
 function actionButtons(x){return x.status==="pending"?'<button class="approve" onclick="setStatus(\''+escapeHtml(x.id)+'\',\'confirmed\')">✓ Onayla</button><button class="cancel" onclick="setStatus(\''+escapeHtml(x.id)+'\',\'cancelled\')">✕ İptal</button>':"";}
 function appointmentTable(items){if(!items.length)return '<div class="muted">Randevu bulunmuyor.</div>';return '<div class="scroll"><table><tr><th>Müşteri</th><th>Saat</th><th>Hizmet</th><th>Durum</th><th>İşlem</th></tr>'+items.map(x=>'<tr><td>'+escapeHtml(x.customer_name)+'</td><td>'+escapeHtml(x.time)+'</td><td>'+escapeHtml(x.service)+'</td><td>'+badge(x.status)+'</td><td>'+actionButtons(x)+'</td></tr>').join("")+"</table></div>";}
+async function loadUsage(){
+ const r=await fetch("/api/usage"); if(!r.ok)return;
+ const u=await r.json(), el=document.getElementById("usageInfo"); if(!el)return;
+ const a=u.used?.appointments||0, al=u.limits?.appointments||0, m=u.used?.ai_messages||0, ml=u.limits?.ai_messages||0;
+ el.innerHTML="Randevu: <b>"+a+"/"+al+"</b><br>AI mesajı: <b>"+m+"/"+ml+"</b>";
+}
+async function loadAudit(){
+ const r=await fetch("/api/audit"); if(!r.ok)return;
+ const rows=await r.json(), el=document.getElementById("auditLogs"); if(!el)return;
+ el.innerHTML=rows.length?rows.slice(0,20).map(x=>"<div style='padding:7px 0;border-bottom:1px solid #e5e7eb'><b>"+String(x.action||"").replace(/</g,"&lt;")+"</b><br><span class='muted'>"+new Date(x.created_at).toLocaleString("tr-TR")+"</span></div>").join(""):"Henüz denetim kaydı yok.";
+}
 async function loadSubscription(){
  const r=await fetch("/api/subscription"); if(!r.ok)return;
  const s=await r.json(); const plan=(s.plan||"trial").toUpperCase();
@@ -116,7 +129,7 @@ async function handleAuthTokens(){
 async function authInit(){
   const status=await fetch("/api/auth/status").then(r=>r.json()).catch(()=>({authenticated:false}));
   const screen=document.getElementById("authScreen"), app=document.getElementById("app");
-  if(status.authenticated){screen.style.display="none";app.style.display="block";loadSubscription();loadDashboard();return;}
+  if(status.authenticated){screen.style.display="none";app.style.display="block";loadSubscription();loadUsage();loadAudit();loadDashboard();return;}
   const setup=await fetch("/api/auth/setup-available").then(r=>r.json()).catch(()=>({available:false}));
   const setupBtn=document.getElementById("setupBtn"), business=document.getElementById("authBusiness"), form=document.getElementById("authForm");
   setupBtn.style.display="block";
