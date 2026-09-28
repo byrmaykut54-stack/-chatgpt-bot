@@ -4,6 +4,7 @@ import urllib.request
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 CONFIG_PATH = "business_config.json"
+HTML_PATH = "index.html"
 
 DEFAULT_CONFIG = {
     "business_name": "Demo İşletme",
@@ -47,10 +48,7 @@ MÜŞTERİ MESAJI:
 
 Sadece müşteriye gönderilebilecek cevabı üret."""
 
-    payload = {
-        "contents": [{"parts": [{"text": prompt}]}]
-    }
-
+    payload = {"contents": [{"parts": [{"text": prompt}]}]}
     req = urllib.request.Request(
         "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent",
         data=json.dumps(payload).encode("utf-8"),
@@ -72,13 +70,39 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
+        self.send_header("Access-Control-Allow-Origin", "*")
         self.end_headers()
         self.wfile.write(body)
 
+    def do_OPTIONS(self):
+        self.send_response(204)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.end_headers()
+
     def do_GET(self):
+        if self.path in ("/", "/index.html"):
+            try:
+                with open(HTML_PATH, "rb") as f:
+                    body = f.read()
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+            except FileNotFoundError:
+                self.send_json(404, {"error": "index.html bulunamadı"})
+            return
+
+        if self.path == "/api/business":
+            self.send_json(200, load_config())
+            return
+
         if self.path == "/health":
             self.send_json(200, {"status": "ok", "service": "AI İşletme Asistanı"})
             return
+
         self.send_json(404, {"error": "Not found"})
 
     def do_POST(self):
@@ -102,5 +126,5 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json(500, {"error": str(exc)})
 
 if __name__ == "__main__":
-    print("AI İşletme Asistanı çalışıyor: http://localhost:8080")
+    print("AI İşletme Asistanı: http://localhost:8080")
     HTTPServer(("0.0.0.0", 8080), Handler).serve_forever()
