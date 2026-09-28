@@ -7,6 +7,12 @@ try:
 except ImportError:
     psycopg = None
 
+try:
+    from cryptography.fernet import Fernet, InvalidToken
+except ImportError:
+    Fernet = None
+    InvalidToken = Exception
+
 DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
 
 SCHEMA = """
@@ -126,6 +132,13 @@ CREATE TABLE IF NOT EXISTS email_verification_tokens (
  token_hash TEXT PRIMARY KEY, user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
  expires_at TIMESTAMPTZ NOT NULL, used_at TIMESTAMPTZ, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+CREATE TABLE IF NOT EXISTS rate_limits (
+ key TEXT PRIMARY KEY,
+ window_started_at TIMESTAMPTZ NOT NULL,
+ hits INTEGER NOT NULL DEFAULT 0,
+ updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 """
 
 @contextmanager
@@ -153,6 +166,53 @@ def ensure_schema():
         conn.execute("ALTER TABLE sessions ALTER COLUMN expires_at DROP NOT NULL")
         conn.execute("ALTER TABLE sessions ADD COLUMN IF NOT EXISTS revoked_at TIMESTAMPTZ")
         conn.commit()
+
+def _fernet():
+    key = os.environ.get("NEXORA_ENCRYPTION_KEY", "").strip()
+    if not key or Fernet is None:
+        return None
+    return Fernet(key.encode("utf-8"))
+
+def encrypt_secret(value):
+    value = str(value or "")
+    if not value:
+        return ""
+    f = _fernet()
+    if not f:
+        return value
+    return f.encrypt(value.encode("utf-8")).decode("utf-8")
+
+def decrypt_secret(value):
+    value = str(value or "")
+    if not value:
+        return ""
+    f = _fernet()
+    if not f or not value.startswith("gAAAA"):
+        return value
+    try:
+        return f.decrypt(value.encode("utf-8")).decode("utf-8")
+    except InvalidToken:
+        raise RuntimeError("NEXORA_ENCRYPTION_KEY ile WhatsApp erişim anahtarı çözülemedi.")
+
+def shared_rate_limited(key, limit, window_seconds):
+    now = datetime.now(timezone.utc)
+    with connection() as conn:
+        row = conn.execute(
+            "SELECT window_started_at, hits FROM rate_limits WHERE key=%s FOR UPDATE",
+            (key,)
+        ).fetchone()
+        if not row or (now - row[0]).total_seconds() >= window_seconds:
+            conn.execute(
+                "INSERT INTO rate_limits (key,window_started_at,hits,updated_at) VALUES (%s,%s,1,NOW()) "
+                "ON CONFLICT (key) DO UPDATE SET window_started_at=EXCLUDED.window_started_at,hits=1,updated_at=NOW()",
+                (key, now)
+            )
+            conn.commit()
+            return False
+        hits = int(row[1]) + 1
+        conn.execute("UPDATE rate_limits SET hits=%s,updated_at=NOW() WHERE key=%s", (hits, key))
+        conn.commit()
+        return hits > limit
 
 def create_business(name, config):
     with connection() as conn:
@@ -340,16 +400,25 @@ def get_business_whatsapp(business_id):
             "SELECT whatsapp_phone_number_id, whatsapp_access_token FROM businesses WHERE id=%s",
             (business_id,)
         ).fetchone()
-        return {"phone_number_id": row[0], "access_token": row[1]} if row else {"phone_number_id":"", "access_token":""}
+    if not row:
+        return {"phone_number_id":"", "access_token":""}
+    token = decrypt_secret(row[1])
+    if token and row[1] == token and _fernet():
+        encrypted = encrypt_secret(token)
+        with connection() as conn:
+            conn.execute("UPDATE businesses SET whatsapp_access_token=%s WHERE id=%s", (encrypted, business_id))
+            conn.commit()
+    return {"phone_number_id": row[0], "access_token": token}
 
 def update_business_whatsapp(business_id, phone_number_id=None, access_token=None):
     current = get_business_whatsapp(business_id)
     phone_number_id = current["phone_number_id"] if phone_number_id is None else str(phone_number_id).strip()
     access_token = current["access_token"] if access_token is None else str(access_token).strip()
+    stored_token = encrypt_secret(access_token)
     with connection() as conn:
         conn.execute(
             "UPDATE businesses SET whatsapp_phone_number_id=%s, whatsapp_access_token=%s WHERE id=%s",
-            (phone_number_id, access_token, business_id)
+            (phone_number_id, stored_token, business_id)
         )
         conn.commit()
 
@@ -575,3 +644,4 @@ def complete_billing_checkout(checkout_token):
     with connection() as conn:
         conn.execute("UPDATE billing_checkout_sessions SET completed_at=NOW() WHERE checkout_token=%s",(checkout_token,))
         conn.commit()
+
