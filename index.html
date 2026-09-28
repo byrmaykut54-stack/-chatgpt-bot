@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AI İşletme Asistanı</title>
+<style>
+body{font-family:Arial,sans-serif;max-width:760px;margin:0 auto;padding:20px;background:#f5f5f5;color:#222}
+.card{background:#fff;border-radius:16px;padding:20px;box-shadow:0 4px 18px #0001}
+h1{margin-top:0}.muted{color:#666}.chat{min-height:260px;margin:20px 0;padding:12px;background:#fafafa;border-radius:12px;overflow:auto}
+.msg{padding:10px 12px;margin:8px 0;border-radius:12px;white-space:pre-wrap}.user{background:#e9f2ff}.bot{background:#eef8ee}
+form{display:flex;gap:8px}input{flex:1;padding:13px;border:1px solid #ddd;border-radius:10px;font-size:16px}button{padding:13px 18px;border:0;border-radius:10px;cursor:pointer}
+</style>
+</head>
+<body>
+<div class="card">
+<h1>🤖 AI İşletme Asistanı</h1>
+<div id="business" class="muted">İşletme bilgileri yükleniyor...</div>
+<div id="chat" class="chat"></div>
+<form id="form">
+<input id="message" placeholder="Müşteri mesajını yazın..." autocomplete="off">
+<button>Gönder</button>
+</form>
+</div>
+<script>
+const chat=document.getElementById("chat");
+const business=document.getElementById("business");
+function add(text,cls){const d=document.createElement("div");d.className="msg "+cls;d.textContent=text;chat.appendChild(d);chat.scrollTop=chat.scrollHeight;}
+fetch("/api/business").then(r=>r.json()).then(b=>{
+ business.textContent=b.business_name+" • "+b.sector+" • "+b.working_hours;
+}).catch(()=>business.textContent="İşletme bilgisi alınamadı.");
+document.getElementById("form").addEventListener("submit",async e=>{
+ e.preventDefault();
+ const input=document.getElementById("message");
+ const message=input.value.trim(); if(!message)return;
+ add(message,"user"); input.value="";
+ add("Yanıt hazırlanıyor...","bot");
+ const pending=chat.lastChild;
+ try{
+   const r=await fetch("/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message})});
+   const data=await r.json();
+   pending.textContent=data.reply||data.error||"Yanıt alınamadı.";
+ }catch(err){pending.textContent="Sunucuya bağlanılamadı.";}
+});
+</script>
+</body>
+</html>
