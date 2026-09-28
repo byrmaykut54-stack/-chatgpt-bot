@@ -526,6 +526,17 @@ def parse_whatsapp_message(data):
         return None
 
 class Handler(BaseHTTPRequestHandler):
+    def end_headers(self):
+        # Baseline browser security headers for the SaaS surface.
+        # CSP is intentionally omitted here because the current frontend uses
+        # inline styles/scripts; it can be tightened after a nonce-based migration.
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("X-Frame-Options", "DENY")
+        self.send_header("Referrer-Policy", "strict-origin-when-cross-origin")
+        self.send_header("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+        self.send_header("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+        super().end_headers()
+
     def send_json(self, status, payload):
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         self.send_response(status)
