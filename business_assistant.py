@@ -755,3 +755,33 @@ class Handler(BaseHTTPRequestHandler):
                 if not user_can(user,"appointments"):
                     self.send_json(403,{"error":"Randevu işlemi yapma yetkiniz yok."}); return
                 appointment, error = create_appointment(data, user)
+                if not appointment:
+                    self.send_json(409 if error and "başka bir randevu" in error else 400, {"error": error or "Randevu oluşturulamadı"}); return
+                self.send_json(201, appointment); return
+
+            if self.path == "/api/appointments/status":
+                user=auth_required(self)
+                if not user: return
+                if not user_can(user,"appointments"):
+                    self.send_json(403,{"error":"Randevu durumunu değiştirme yetkiniz yok."}); return
+                appointment_id=str(data.get("id","")).strip()
+                status=str(data.get("status","")).strip()
+                if status not in {"pending","confirmed","cancelled","completed"}:
+                    self.send_json(400,{"error":"Geçersiz durum"}); return
+                items=load_appointments(user)
+                for item in items:
+                    if item["id"] == appointment_id:
+                        item["status"]=status
+                        save_appointments(items,user)
+                        self.send_json(200,{"success":True}); return
+                self.send_json(404,{"error":"Randevu bulunamadı"}); return
+
+            self.send_json(404,{"error":"Not found"})
+        except Exception as exc:
+            self.send_json(500,{"error":str(exc)})
+
+if __name__ == "__main__":
+    initialize_database()
+    port=int(os.environ.get("PORT","8080"))
+    print(f"AI İşletme Asistanı: http://0.0.0.0:{port}")
+    HTTPServer(("0.0.0.0",port),Handler).serve_forever()
