@@ -80,6 +80,16 @@ class BusinessAssistantTests(unittest.TestCase):
             )
 
 
+    def test_appointment_time_parser(self):
+        self.assertEqual(business_assistant.appointment_time_from_text("Saat 9:30 uygun mu?"), "09:30")
+        self.assertEqual(business_assistant.appointment_time_from_text("14 uygun mu?"), "14:00")
+        self.assertEqual(business_assistant.appointment_time_from_text("merhaba"), "")
+
+    def test_closed_day_detection(self):
+        config = {**business_assistant.DEFAULT_CONFIG, "closed_days": ["Pazar"]}
+        self.assertTrue(business_assistant.is_closed_day("2026-10-04", config))
+        self.assertFalse(business_assistant.is_closed_day("2026-10-05", config))
+
     def test_password_hash_and_verify(self):
         hashed = business_assistant.hash_password("NexoraTest123!")
         self.assertTrue(business_assistant.verify_password("NexoraTest123!", hashed))
