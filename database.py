@@ -58,6 +58,26 @@ CREATE TABLE IF NOT EXISTS messages (
 
 CREATE INDEX IF NOT EXISTS messages_business_created_idx
 ON messages (business_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS users (
+    id BIGSERIAL PRIMARY KEY,
+    business_id BIGINT NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
+    email TEXT NOT NULL,
+    password_hash TEXT NOT NULL,
+    role TEXT NOT NULL DEFAULT 'owner',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (email)
+);
+
+CREATE TABLE IF NOT EXISTS sessions (
+    id BIGSERIAL PRIMARY KEY,
+    token_hash TEXT PRIMARY KEY,
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    expires_at TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS sessions_expires_idx ON sessions (expires_at);
 """
 
 @contextmanager
@@ -93,6 +113,33 @@ def get_business_id(config):
         conn.commit()
         return row[0]
 
+def get_user_by_email(email):
+    with connection() as conn:
+        return conn.execute("SELECT id, business_id, email, password_hash, role FROM users WHERE lower(email)=lower(%s) LIMIT 1", (email.strip(),)).fetchone()
+
+def count_users():
+    with connection() as conn:
+        return conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+
+def create_user(email, password_hash, business_id, role="owner"):
+    with connection() as conn:
+        row = conn.execute("INSERT INTO users (business_id,email,password_hash,role) VALUES (%s,%s,%s,%s) RETURNING id", (business_id, email.strip().lower(), password_hash, role)).fetchone()
+        conn.commit()
+        return row[0]
+
+def create_session(token_hash, user_id, expires_at):
+    with connection() as conn:
+        conn.execute("INSERT INTO sessions (token_hash,user_id,expires_at) VALUES (%s,%s,%s)", (token_hash, user_id, expires_at))
+        conn.commit()
+
+def get_session_user(token_hash):
+    with connection() as conn:
+        return conn.execute("SELECT u.id,u.business_id,u.email,u.role,b.name,b.config FROM sessions s JOIN users u ON u.id=s.user_id JOIN businesses b ON b.id=u.business_id WHERE s.token_hash=%s AND s.expires_at>NOW() LIMIT 1", (token_hash,)).fetchone()
+
+def delete_session(token_hash):
+    with connection() as conn:
+        conn.execute("DELETE FROM sessions WHERE token_hash=%s", (token_hash,))
+        conn.commit()
 def load_appointments(config):
     business_id = get_business_id(config)
     with connection() as conn:
