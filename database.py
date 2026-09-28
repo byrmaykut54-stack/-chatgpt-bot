@@ -138,7 +138,7 @@ def count_users():
 
 def create_user(email, password_hash, business_id, role="owner"):
     with connection() as conn:
-        row = conn.execute("INSERT INTO users (business_id,email,password_hash,role) VALUES (%s,%s,%s,%s) RETURNING id", (business_id, email.strip().lower(), password_hash, role)).fetchone()
+        row = conn.execute("INSERT INTO users (business_id,email,password_hash,role,permissions) VALUES (%s,%s,%s,%s,%s) RETURNING id", (business_id, email.strip().lower(), password_hash, role, psycopg.types.json.Json({"appointments":True,"customers":True,"messages":True,"business_settings":role=="owner","team":role=="owner","reports":True}))).fetchone()
         conn.commit()
         return row[0]
 
