@@ -18,11 +18,6 @@ try:
 except ImportError:
     database = None
 
-try:
-    import database
-except ImportError:
-    database = None
-
 DEFAULT_CONFIG = {
     "business_name": "Demo İşletme",
     "sector": "Berber",
@@ -291,7 +286,7 @@ def is_time_available(date, time, config=None, user=None):
     active = {"pending", "confirmed"}
     return not any(item.get("date") == date and item.get("time") == time and item.get("status") in active for item in items)
 
-def get_free_slots(date, config):
+def get_free_slots(date, config, user=None):
     if is_closed_day(date, config):
         return []
     hours = str(config.get("working_hours", "09:00-18:00"))
@@ -300,7 +295,10 @@ def get_free_slots(date, config):
         return []
     start = int(match.group(1))
     end = int(match.group(3))
-    return [f"{hour:02d}:00" for hour in range(start, end) if is_time_available(date, f"{hour:02d}:00", config)]
+    first_hour = start
+    if date == datetime.now().strftime("%Y-%m-%d"):
+        first_hour = max(start, datetime.now().hour + (1 if datetime.now().minute else 0))
+    return [f"{hour:02d}:00" for hour in range(first_hour, end) if is_time_available(date, f"{hour:02d}:00", config, user)]
 
 def handle_customer_message(message, channel="web", customer_name="", phone="", user=None):
     config = business_config_for_user(user) if user else load_config()
@@ -331,7 +329,7 @@ def handle_customer_message(message, channel="web", customer_name="", phone="", 
         if is_closed_day(date, config):
             return {"reply": f"{date} günü işletme kapalıdır. Pazar günleri tatildir."}
         if not time:
-            slots = get_free_slots(date, config)
+            slots = get_free_slots(date, config, user)
             if slots:
                 return {"reply": f"Bugün ({date}) boş saatler: " + ", ".join(slots) + "."}
             return {"reply": f"Bugün ({date}) için uygun boş saat görünmüyor."}
@@ -473,6 +471,13 @@ class Handler(BaseHTTPRequestHandler):
             if not user_can(user,"messages"):
                 self.send_json(403,{"error":"Mesajlara erişim yetkiniz yok."}); return
             self.send_json(200, load_messages(user)); return
+        if parsed.path == "/api/users":
+            user=auth_required(self)
+            if not user: return
+            if not user_can(user,"team"):
+                self.send_json(403,{"error":"Ekip bilgilerine erişim yetkiniz yok."}); return
+            rows=database.list_users(user[1])
+            self.send_json(200,[{"id":r[0],"email":r[1],"role":r[2],"created_at":r[3].isoformat() if hasattr(r[3],"isoformat") else str(r[3])} for r in rows]); return
         if parsed.path == "/health":
             self.send_json(200, {"status": "ok", "service": "AI İşletme Asistanı"}); return
         self.send_json(404, {"error": "Not found"})
