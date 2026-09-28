@@ -318,6 +318,20 @@ def list_users(business_id):
     with connection() as conn:
         return conn.execute("SELECT id,email,role,created_at FROM users WHERE business_id=%s ORDER BY created_at",(business_id,)).fetchall()
 
+def get_user_in_business(business_id, user_id):
+    with connection() as conn:
+        return conn.execute(
+            "SELECT id,email,role FROM users WHERE id=%s AND business_id=%s",
+            (user_id, business_id)
+        ).fetchone()
+
+def count_owners(business_id):
+    with connection() as conn:
+        return conn.execute(
+            "SELECT COUNT(*) FROM users WHERE business_id=%s AND role='owner'",
+            (business_id,)
+        ).fetchone()[0]
+
 def update_user_role(business_id,user_id,role):
     with connection() as conn:
         conn.execute("UPDATE users SET role=%s WHERE id=%s AND business_id=%s",(role,user_id,business_id))
