@@ -1,10 +1,12 @@
 import json
 import os
 import urllib.request
+from datetime import datetime
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 CONFIG_PATH = "business_config.json"
 HTML_PATH = "index.html"
+APPOINTMENTS_PATH = "appointments.json"
 
 DEFAULT_CONFIG = {
     "business_name": "Demo İşletme",
@@ -31,6 +33,16 @@ def load_config():
         return DEFAULT_CONFIG
     with open(CONFIG_PATH, "r", encoding="utf-8") as f:
         return json.load(f)
+
+def load_appointments():
+    if not os.path.exists(APPOINTMENTS_PATH):
+        return []
+    with open(APPOINTMENTS_PATH, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+def save_appointments(items):
+    with open(APPOINTMENTS_PATH, "w", encoding="utf-8") as f:
+        json.dump(items, f, ensure_ascii=False, indent=2)
 
 def ask_gemini(message, config):
     api_key = os.environ.get("GEMINI_API_KEY")
@@ -99,6 +111,10 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json(200, load_config())
             return
 
+        if self.path == "/api/appointments":
+            self.send_json(200, load_appointments())
+            return
+
         if self.path == "/health":
             self.send_json(200, {"status": "ok", "service": "AI İşletme Asistanı"})
             return
@@ -106,22 +122,66 @@ class Handler(BaseHTTPRequestHandler):
         self.send_json(404, {"error": "Not found"})
 
     def do_POST(self):
-        if self.path != "/chat":
-            self.send_json(404, {"error": "Not found"})
-            return
-
         try:
             length = int(self.headers.get("Content-Length", "0"))
             raw = self.rfile.read(length)
             data = json.loads(raw or "{}")
-            message = str(data.get("message", "")).strip()
 
-            if not message:
-                self.send_json(400, {"error": "message alanı gerekli"})
+            if self.path == "/chat":
+                message = str(data.get("message", "")).strip()
+                if not message:
+                    self.send_json(400, {"error": "message alanı gerekli"})
+                    return
+                answer = ask_gemini(message, load_config())
+                self.send_json(200, {"reply": answer})
                 return
 
-            answer = ask_gemini(message, load_config())
-            self.send_json(200, {"reply": answer})
+            if self.path == "/api/appointments":
+                required = ["customer_name", "phone", "date", "time", "service"]
+                missing = [x for x in required if not str(data.get(x, "")).strip()]
+                if missing:
+                    self.send_json(400, {"error": "Eksik alanlar", "fields": missing})
+                    return
+
+                appointment = {
+                    "id": datetime.utcnow().strftime("%Y%m%d%H%M%S%f"),
+                    "customer_name": str(data["customer_name"]).strip(),
+                    "phone": str(data["phone"]).strip(),
+                    "date": str(data["date"]).strip(),
+                    "time": str(data["time"]).strip(),
+                    "service": str(data["service"]).strip(),
+                    "note": str(data.get("note", "")).strip(),
+                    "status": "pending",
+                    "created_at": datetime.utcnow().isoformat() + "Z"
+                }
+                items = load_appointments()
+                items.append(appointment)
+                save_appointments(items)
+                self.send_json(201, appointment)
+                return
+
+            if self.path == "/api/appointments/status":
+                appointment_id = str(data.get("id", "")).strip()
+                status = str(data.get("status", "")).strip()
+                allowed = {"pending", "confirmed", "cancelled", "completed"}
+                if not appointment_id or status not in allowed:
+                    self.send_json(400, {"error": "Geçersiz id veya durum"})
+                    return
+                items = load_appointments()
+                found = False
+                for item in items:
+                    if item["id"] == appointment_id:
+                        item["status"] = status
+                        found = True
+                        break
+                if not found:
+                    self.send_json(404, {"error": "Randevu bulunamadı"})
+                    return
+                save_appointments(items)
+                self.send_json(200, {"success": True})
+                return
+
+            self.send_json(404, {"error": "Not found"})
         except Exception as exc:
             self.send_json(500, {"error": str(exc)})
 
