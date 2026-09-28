@@ -773,6 +773,20 @@ class Handler(BaseHTTPRequestHandler):
 
             data = json.loads(raw_body)
 
+            if self.path == "/internal/reminders":
+                expected = os.environ.get("NEXORA_REMINDER_CRON_SECRET", "").strip()
+                provided = self.headers.get("X-Nexora-Cron-Secret", "").strip()
+                if not expected or not provided or not hmac.compare_digest(expected, provided):
+                    self.send_json(403, {"error": "Hatırlatma worker doğrulaması başarısız."})
+                    return
+                try:
+                    from reminder_worker import main as run_reminders
+                    run_reminders()
+                    self.send_json(200, {"success": True})
+                except Exception as exc:
+                    self.send_json(500, {"error": "Hatırlatma worker çalıştırılamadı.", "detail": str(exc)})
+                return
+
             if self.path == "/api/billing/complete":
                 user=auth_required(self)
                 if not user: return
@@ -1128,4 +1142,5 @@ if __name__ == "__main__":
     port=int(os.environ.get("PORT","8080"))
     print(f"AI İşletme Asistanı: http://0.0.0.0:{port}")
     HTTPServer(("0.0.0.0",port),Handler).serve_forever()
+
 
