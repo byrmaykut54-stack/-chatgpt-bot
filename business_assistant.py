@@ -125,13 +125,7 @@ def create_appointment(data):
 
     items = load_appointments()
     active = {"pending", "confirmed"}
-    conflict = next(
-        (item for item in items
-         if item.get("date") == appointment["date"]
-         and item.get("time") == appointment["time"]
-         and item.get("status") in active),
-        None
-    )
+    conflict = next((item for item in items if item.get("date") == appointment["date"] and item.get("time") == appointment["time"] and item.get("status") in active), None)
     if conflict:
         return None, "Bu tarih ve saatte başka bir randevu bulunuyor."
 
@@ -179,18 +173,8 @@ def send_whatsapp_text(to, message):
         return False, "WhatsApp erişim bilgileri tanımlı değil."
 
     url = f"https://graph.facebook.com/v23.0/{phone_number_id}/messages"
-    payload = {
-        "messaging_product": "whatsapp",
-        "to": to,
-        "type": "text",
-        "text": {"preview_url": False, "body": message}
-    }
-    req = urllib.request.Request(
-        url,
-        data=json.dumps(payload).encode("utf-8"),
-        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
-        method="POST"
-    )
+    payload = {"messaging_product": "whatsapp", "to": to, "type": "text", "text": {"preview_url": False, "body": message}}
+    req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"}, method="POST")
     try:
         with urllib.request.urlopen(req, timeout=30) as response:
             return True, json.load(response)
@@ -216,12 +200,7 @@ def parse_whatsapp_message(data):
         msg = messages[0]
         if msg.get("type") != "text":
             return None
-        return {
-            "message": msg["text"]["body"],
-            "phone": msg.get("from", ""),
-            "customer_name": value.get("contacts", [{}])[0].get("profile", {}).get("name", ""),
-            "message_id": msg.get("id", "")
-        }
+        return {"message": msg["text"]["body"], "phone": msg.get("from", ""), "customer_name": value.get("contacts", [{}])[0].get("profile", {}).get("name", ""), "message_id": msg.get("id", "")}
     except (KeyError, IndexError, TypeError):
         return None
 
@@ -282,8 +261,7 @@ class Handler(BaseHTTPRequestHandler):
             if self.path == "/webhook/whatsapp":
                 incoming = parse_whatsapp_message(data)
                 if not incoming:
-                    self.send_json(200, {"received": True, "processed": False})
-                    return
+                    self.send_json(200, {"received": True, "processed": False}); return
                 result = handle_customer_message(incoming["message"], "whatsapp", incoming["customer_name"], incoming["phone"])
                 ok, send_result = send_whatsapp_text(incoming["phone"], result["reply"])
                 out = {"received": True, "processed": True, "result": result, "reply_sent": ok}
@@ -291,19 +269,9 @@ class Handler(BaseHTTPRequestHandler):
                     out["reply_error"] = send_result
                 else:
                     messages = load_messages()
-                    messages.append({
-                        "id": datetime.utcnow().strftime("%Y%m%d%H%M%S%f"),
-                        "channel": "whatsapp",
-                        "direction": "outbound",
-                        "customer_name": incoming["customer_name"],
-                        "phone": incoming["phone"],
-                        "message": result["reply"],
-                        "intent": "ai_reply",
-                        "created_at": datetime.utcnow().isoformat() + "Z"
-                    })
+                    messages.append({"id": datetime.utcnow().strftime("%Y%m%d%H%M%S%f"), "channel": "whatsapp", "direction": "outbound", "customer_name": incoming["customer_name"], "phone": incoming["phone"], "message": result["reply"], "intent": "ai_reply", "created_at": datetime.utcnow().isoformat() + "Z"})
                     save_messages(messages)
-                self.send_json(200, out)
-                return
+                self.send_json(200, out); return
 
             if self.path in ("/chat", "/webhook/message"):
                 message = str(data.get("message", "")).strip()
@@ -336,5 +304,6 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json(500, {"error": str(exc)})
 
 if __name__ == "__main__":
-    print("AI İşletme Asistanı: http://localhost:8080")
-    HTTPServer(("0.0.0.0", 8080), Handler).serve_forever()
+    port = int(os.environ.get("PORT", "8080"))
+    print(f"AI İşletme Asistanı: http://0.0.0.0:{port}")
+    HTTPServer(("0.0.0.0", port), Handler).serve_forever()
