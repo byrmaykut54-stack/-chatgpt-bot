@@ -59,8 +59,7 @@ def gemini_request(prompt, max_tokens=1000):
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
         raise RuntimeError("GEMINI_API_KEY tanımlı değil.")
-    payload = {"contents": [{"parts": [{"text": prompt}]}],
-               "generationConfig": {"maxOutputTokens": max_tokens}}
+    payload = {"contents": [{"parts": [{"text": prompt}]}], "generationConfig": {"maxOutputTokens": max_tokens}}
     req = urllib.request.Request(
         "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent",
         data=json.dumps(payload).encode("utf-8"),
@@ -86,7 +85,6 @@ Sadece müşteriye gönderilebilecek cevabı üret."""
 def detect_appointment_intent(message, config):
     prompt = f"""Bir işletme mesajını randevu açısından sınıflandır.
 Sadece geçerli JSON döndür, Markdown kullanma.
-
 Alanlar:
 intent: "appointment" veya "other"
 customer_name: mesajda varsa isim, yoksa ""
@@ -121,12 +119,25 @@ def create_appointment(data):
         "status": "pending",
         "created_at": datetime.utcnow().isoformat() + "Z"
     }
-    if any(not appointment[x] for x in ["customer_name", "phone", "date", "time", "service"]):
-        return None
+    required = ["customer_name", "phone", "date", "time", "service"]
+    if any(not appointment[x] for x in required):
+        return None, "customer_name, phone, date, time ve service zorunlu"
+
     items = load_appointments()
+    active = {"pending", "confirmed"}
+    conflict = next(
+        (item for item in items
+         if item.get("date") == appointment["date"]
+         and item.get("time") == appointment["time"]
+         and item.get("status") in active),
+        None
+    )
+    if conflict:
+        return None, "Bu tarih ve saatte başka bir randevu bulunuyor."
+
     items.append(appointment)
     save_appointments(items)
-    return appointment
+    return appointment, None
 
 def handle_customer_message(message, channel="web", customer_name="", phone=""):
     config = load_config()
@@ -134,6 +145,7 @@ def handle_customer_message(message, channel="web", customer_name="", phone=""):
     record = {
         "id": datetime.utcnow().strftime("%Y%m%d%H%M%S%f"),
         "channel": channel,
+        "direction": "inbound",
         "customer_name": customer_name or intent.get("customer_name", ""),
         "phone": phone or intent.get("phone", ""),
         "message": message,
@@ -150,13 +162,40 @@ def handle_customer_message(message, channel="web", customer_name="", phone=""):
         required = ["customer_name", "phone", "date", "time", "service"]
         missing = [x for x in required if not str(intent.get(x, "")).strip()]
         if not missing:
-            appointment = create_appointment(intent)
+            appointment, error = create_appointment(intent)
             if appointment:
                 return {"reply": f"Randevunuzu aldım. {appointment['date']} {appointment['time']} için {appointment['service']} kaydınız oluşturuldu.", "appointment": appointment}
+            if error == "Bu tarih ve saatte başka bir randevu bulunuyor.":
+                return {"reply": "Bu tarih ve saatte başka bir randevu bulunuyor. Lütfen farklı bir saat seçer misiniz?"}
         labels = {"customer_name":"adınızı","phone":"telefon numaranızı","date":"tarihi","time":"saati","service":"hizmeti"}
         return {"reply": "Randevu oluşturabilmem için lütfen " + ", ".join(labels[x] for x in missing) + " bilgisini de paylaşır mısınız?"}
 
     return {"reply": ask_gemini(message, config)}
+
+def send_whatsapp_text(to, message):
+    token = os.environ.get("WHATSAPP_ACCESS_TOKEN")
+    phone_number_id = os.environ.get("WHATSAPP_PHONE_NUMBER_ID")
+    if not token or not phone_number_id:
+        return False, "WhatsApp erişim bilgileri tanımlı değil."
+
+    url = f"https://graph.facebook.com/v23.0/{phone_number_id}/messages"
+    payload = {
+        "messaging_product": "whatsapp",
+        "to": to,
+        "type": "text",
+        "text": {"preview_url": False, "body": message}
+    }
+    req = urllib.request.Request(
+        url,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        method="POST"
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=30) as response:
+            return True, json.load(response)
+    except Exception as exc:
+        return False, str(exc)
 
 def whatsapp_verify(query):
     params = parse_qs(query)
@@ -245,11 +284,25 @@ class Handler(BaseHTTPRequestHandler):
                 if not incoming:
                     self.send_json(200, {"received": True, "processed": False})
                     return
-                result = handle_customer_message(
-                    incoming["message"], "whatsapp",
-                    incoming["customer_name"], incoming["phone"]
-                )
-                self.send_json(200, {"received": True, "processed": True, "result": result})
+                result = handle_customer_message(incoming["message"], "whatsapp", incoming["customer_name"], incoming["phone"])
+                ok, send_result = send_whatsapp_text(incoming["phone"], result["reply"])
+                out = {"received": True, "processed": True, "result": result, "reply_sent": ok}
+                if not ok:
+                    out["reply_error"] = send_result
+                else:
+                    messages = load_messages()
+                    messages.append({
+                        "id": datetime.utcnow().strftime("%Y%m%d%H%M%S%f"),
+                        "channel": "whatsapp",
+                        "direction": "outbound",
+                        "customer_name": incoming["customer_name"],
+                        "phone": incoming["phone"],
+                        "message": result["reply"],
+                        "intent": "ai_reply",
+                        "created_at": datetime.utcnow().isoformat() + "Z"
+                    })
+                    save_messages(messages)
+                self.send_json(200, out)
                 return
 
             if self.path in ("/chat", "/webhook/message"):
@@ -260,9 +313,9 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(200, result); return
 
             if self.path == "/api/appointments":
-                appointment = create_appointment(data)
+                appointment, error = create_appointment(data)
                 if not appointment:
-                    self.send_json(400, {"error": "customer_name, phone, date, time ve service zorunlu"}); return
+                    self.send_json(409 if error and "başka bir randevu" in error else 400, {"error": error or "Randevu oluşturulamadı"}); return
                 self.send_json(201, appointment); return
 
             if self.path == "/api/appointments/status":
