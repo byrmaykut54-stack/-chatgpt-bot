@@ -283,6 +283,37 @@ def save_messages_by_business(business_id, items):
         conn.commit()
 
 
+def list_customers_by_business(business_id):
+    with connection() as conn:
+        return conn.execute(
+            "SELECT id,name,phone,created_at,updated_at FROM customers WHERE business_id=%s ORDER BY updated_at DESC",
+            (business_id,)
+        ).fetchall()
+
+def get_business_report(business_id):
+    with connection() as conn:
+        appointments = conn.execute(
+            "SELECT COUNT(*), COUNT(*) FILTER (WHERE status='pending'), COUNT(*) FILTER (WHERE status='confirmed'), COUNT(*) FILTER (WHERE status='completed'), COUNT(*) FILTER (WHERE status='cancelled') FROM appointments WHERE business_id=%s",
+            (business_id,)
+        ).fetchone()
+        customers = conn.execute(
+            "SELECT COUNT(*) FROM customers WHERE business_id=%s",
+            (business_id,)
+        ).fetchone()[0]
+        messages = conn.execute(
+            "SELECT COUNT(*) FROM messages WHERE business_id=%s",
+            (business_id,)
+        ).fetchone()[0]
+        return {
+            "appointments_total": appointments[0],
+            "appointments_pending": appointments[1],
+            "appointments_confirmed": appointments[2],
+            "appointments_completed": appointments[3],
+            "appointments_cancelled": appointments[4],
+            "customers_total": customers,
+            "messages_total": messages
+        }
+
 def list_users(business_id):
     with connection() as conn:
         return conn.execute("SELECT id,email,role,created_at FROM users WHERE business_id=%s ORDER BY created_at",(business_id,)).fetchall()
