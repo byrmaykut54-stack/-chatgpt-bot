@@ -135,9 +135,42 @@ def create_appointment(data):
     save_appointments(items)
     return appointment, None
 
+def local_intent_hint(message, config):
+    text = message.lower()
+    appointment_words = ("randevu", "rezervasyon", "uygun saat", "saat")
+    if any(word in text for word in appointment_words):
+        import re
+        time_match = re.search(r"\b([01]?\d|2[0-3])[:.]([0-5]\d)\b", text)
+        service = ""
+        for item in config.get("services", []):
+            name = str(item.get("name", "")).strip()
+            if name and name.lower() in text:
+                service = name
+                break
+        return {
+            "intent": "appointment",
+            "customer_name": "",
+            "phone": "",
+            "date": "",
+            "time": f"{int(time_match.group(1)):02d}:{time_match.group(2)}" if time_match else "",
+            "service": service,
+            "note": ""
+        }
+
+    for item in config.get("services", []):
+        name = str(item.get("name", "")).strip()
+        price = str(item.get("price", "")).strip()
+        normalized = name.lower().replace("+", " ")
+        if name and price and (
+            name.lower() in text or (normalized.replace(" ", "") == "saçsakal" and "saç sakal" in text)
+        ) and any(word in text for word in ("fiyat", "ne kadar", "ücret", "kaç tl")):
+            return {"intent": "price", "service": name, "price": price}
+    return None
+
 def handle_customer_message(message, channel="web", customer_name="", phone=""):
     config = load_config()
-    intent = detect_appointment_intent(message, config)
+    hint = local_intent_hint(message, config)
+    intent = hint if hint else detect_appointment_intent(message, config)
     record = {
         "id": datetime.utcnow().strftime("%Y%m%d%H%M%S%f"),
         "channel": channel,
@@ -151,6 +184,9 @@ def handle_customer_message(message, channel="web", customer_name="", phone=""):
     messages = load_messages()
     messages.append(record)
     save_messages(messages)
+
+    if intent.get("intent") == "price":
+        return {"reply": f"{intent.get('service')} fiyatı {intent.get('price')}."}
 
     if intent.get("intent") == "appointment":
         intent["customer_name"] = record["customer_name"]
