@@ -13,6 +13,11 @@ HTML_PATH = "index.html"
 APPOINTMENTS_PATH = "appointments.json"
 MESSAGES_PATH = "messages.json"
 
+try:
+    import database
+except ImportError:
+    database = None
+
 DEFAULT_CONFIG = {
     "business_name": "Demo İşletme",
     "sector": "Berber",
@@ -47,17 +52,44 @@ def save_json(path, data):
 def load_config():
     return load_json(CONFIG_PATH, DEFAULT_CONFIG)
 
+def database_enabled():
+    return bool(database and database.enabled())
+
+def initialize_database():
+    if database_enabled():
+        database.ensure_schema()
+        config = load_config()
+        business_id = database.get_business_id(config)
+        legacy_appointments = load_json(APPOINTMENTS_PATH, [])
+        legacy_messages = load_json(MESSAGES_PATH, [])
+        current_appointments = database.load_appointments(config)
+        current_messages = database.load_messages(config)
+        if not current_appointments and legacy_appointments:
+            database.save_appointments(config, legacy_appointments)
+        if not current_messages and legacy_messages:
+            database.save_messages(config, legacy_messages)
+
 def load_appointments():
+    if database_enabled():
+        return database.load_appointments(load_config())
     return load_json(APPOINTMENTS_PATH, [])
 
 def save_appointments(items):
-    save_json(APPOINTMENTS_PATH, items)
+    if database_enabled():
+        database.save_appointments(load_config(), items)
+    else:
+        save_json(APPOINTMENTS_PATH, items)
 
 def load_messages():
+    if database_enabled():
+        return database.load_messages(load_config())
     return load_json(MESSAGES_PATH, [])
 
 def save_messages(items):
-    save_json(MESSAGES_PATH, items)
+    if database_enabled():
+        database.save_messages(load_config(), items)
+    else:
+        save_json(MESSAGES_PATH, items)
 
 def gemini_request(prompt, max_tokens=1000):
     api_key = os.environ.get("GEMINI_API_KEY")
@@ -437,6 +469,7 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json(500, {"error": str(exc)})
 
 if __name__ == "__main__":
+    initialize_database()
     port = int(os.environ.get("PORT", "8080"))
     print(f"AI İşletme Asistanı: http://0.0.0.0:{port}")
     HTTPServer(("0.0.0.0", port), Handler).serve_forever()
