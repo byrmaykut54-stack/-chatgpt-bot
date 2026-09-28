@@ -48,7 +48,7 @@ input{width:100%;padding:11px;border:1px solid #dfe4e8;border-radius:9px;margin:
 <div class="card"><h2>⏳ Bekleyen Randevular</h2><div id="pendingAppointments" class="muted">Yükleniyor...</div></div>
 <div class="card"><h2>👥 Müşteri Listesi</h2><div id="customers" class="muted">Yükleniyor...</div></div>
 </main><aside>
-<div class="card"><h2>⚙️ İşletme Ayarları</h2><form id="businessForm">
+<div class="card"><h2>👤 Ekip & Yetkiler</h2><div id="teamList" class="muted">Yükleniyor...</div></div><div class="card"><h2>⚙️ İşletme Ayarları</h2><form id="businessForm">
 <input id="cfgName" placeholder="İşletme adı" required><input id="cfgSector" placeholder="Sektör" required>
 <input id="cfgHours" placeholder="Çalışma saatleri: 09:00-18:00" required><input id="cfgAddress" placeholder="Adres">
 <input id="cfgClosed" placeholder="Kapalı günler: Pazar">
@@ -114,5 +114,12 @@ businessForm.addEventListener("submit",async e=>{e.preventDefault();
  document.getElementById("cfgStatus").textContent=r.ok?"✅ İşletme ayarları kaydedildi.":"❌ Ayarlar kaydedilemedi."; if(r.ok){document.getElementById("business").textContent=config.business_name+" • "+config.sector+" • "+config.working_hours;}
 });
 loadBusinessSettings();
+async function loadTeam(){
+ const r=await fetch("/api/users"); if(!r.ok){document.getElementById("teamList").textContent="Ekip bilgisi alınamadı.";return}
+ const users=await r.json();
+ document.getElementById("teamList").innerHTML=users.map(u=>'<div style="padding:9px 0;border-bottom:1px solid #edf0f2"><b>'+escapeHtml(u.email)+'</b> <span class="pill">'+escapeHtml(u.role)+'</span></div>').join("");
+}
+loadTeam();
+
 
 </script></body></html>
