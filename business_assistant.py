@@ -117,6 +117,21 @@ def auth_required(handler):
             return None
     return user
 
+
+def subscription_payload(business_id):
+    if not database_enabled():
+        return {"plan":"trial","status":"unknown","trial_active":False,"subscription":None}
+    base=database.get_business_subscription(business_id)
+    base["subscription"]=database.get_subscription_record(business_id)
+    return base
+
+def verify_billing_signature(raw_body, signature):
+    secret=os.environ.get("NEXORA_PAYMENT_WEBHOOK_SECRET","").strip()
+    if not secret or not signature:
+        return False
+    expected="sha256="+hmac.new(secret.encode("utf-8"),raw_body,hashlib.sha256).hexdigest()
+    return hmac.compare_digest(expected,signature.strip())
+
 def user_can(user, module):
     if not user or not database_enabled(): return False
     if user[3] == 'owner': return True
