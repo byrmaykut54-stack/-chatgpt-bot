@@ -137,6 +137,28 @@ def rate_limited(key, limit=RATE_LIMIT_MAX, window=RATE_LIMIT_WINDOW):
     RATE_LIMITS[key] = values
     return False
 
+PLAN_LIMITS = {
+    "trial": {"appointments": 50, "ai_messages": 200},
+    "pro": {"appointments": 1000, "ai_messages": 5000},
+}
+
+def usage_limit_reached(user, metric):
+    if not user or not database_enabled():
+        return False
+    sub=database.get_business_subscription(user[1])
+    plan=str(sub.get("plan","trial")).lower()
+    limit=PLAN_LIMITS.get(plan, PLAN_LIMITS["trial"]).get(metric)
+    if limit is None:
+        return False
+    return database.get_usage(user[1],metric) >= limit
+
+def usage_payload(business_id):
+    sub=database.get_business_subscription(business_id)
+    plan=str(sub.get("plan","trial")).lower()
+    limits=PLAN_LIMITS.get(plan,PLAN_LIMITS["trial"])
+    used=database.get_usage_summary(business_id)
+    return {"plan":plan,"limits":limits,"used":used,"remaining":{k:max(v-used.get(k,0),0) for k,v in limits.items()}}
+
 def auth_required(handler):
     user = current_user(handler)
     if not user:
@@ -1001,10 +1023,13 @@ class Handler(BaseHTTPRequestHandler):
                 if not user: return
                 if not user_can(user,"messages"):
                     self.send_json(403,{"error":"AI müşteri asistanına erişim yetkiniz yok."}); return
+                if usage_limit_reached(user,"ai_messages"):
+                    self.send_json(429,{"error":"Aylık AI mesaj limitinize ulaştınız.","usage":usage_payload(user[1])}); return
                 message = str(data.get("message", "")).strip()
                 if not message:
                     self.send_json(400, {"error": "message alanı gerekli"}); return
                 result = handle_customer_message(message, str(data.get("channel", "web")).strip() or "web", str(data.get("customer_name", "")).strip(), str(data.get("phone", "")).strip(), user)
+                database.increment_usage(user[1],"ai_messages")
                 self.send_json(200, result); return
 
             if self.path == "/api/users/create":
@@ -1110,6 +1135,17 @@ class Handler(BaseHTTPRequestHandler):
                 user=auth_required(self)
                 if not user: return
                 if not user_can(user,"appointments"):
+                    self.send_json(403,{"error":"Randevu işlemi yapma yetkiniz yok."}); return
+                if usage_limit_reached(user,"appointments"):
+                    self.send_json(429,{"error":"Aylık randevu limitinize ulaştınız.","usage":usage_payload(user[1])}); return
+                appointment, error = create_appointment(data, user)
+                if not appointment:
+                    self.send_json(409 if error and "başka bir randevu" in error else 400, {"error": error or "Randevu oluşturulamadı"}); return
+                database.increment_usage(user[1],"appointments")
+                self.send_json(201, appointment); return
+
+            if self.path == "/api/appointments/status":
+
                     self.send_json(403,{"error":"Randevu işlemi yapma yetkiniz yok."}); return
                 appointment, error = create_appointment(data, user)
                 if not appointment:
