@@ -453,3 +453,9 @@ def update_subscription_status(business_id, status, cancel_at_period_end=None, p
         elif status in {"cancelled","canceled","past_due","unpaid","inactive"}:
             conn.execute("UPDATE businesses SET plan='trial', status='active', trial_ends_at=LEAST(COALESCE(trial_ends_at,NOW()), NOW()) WHERE id=%s", (business_id,))
         conn.commit()
+
+def get_business_by_provider_subscription(provider_subscription_id):
+    with connection() as conn:
+        row=conn.execute("SELECT business_id FROM subscriptions WHERE provider_subscription_id=%s",(provider_subscription_id,)).fetchone()
+    return row[0] if row else None
+
