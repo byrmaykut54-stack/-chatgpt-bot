@@ -13,8 +13,8 @@
 
 ## Before public paid launch
 - Configure real payment provider credentials and verify the complete checkout/callback flow.
-- Add a transactional email provider for email verification and password reset.
-- Add CSRF protection for state-changing cookie-authenticated requests.
+- Configure SMTP credentials (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM`) and `PUBLIC_APP_URL` for transactional email delivery.
+- CSRF same-origin protection is implemented for cookie-authenticated state-changing requests.
 - Encrypt WhatsApp access tokens at rest with a server-side key.
 - Move rate limiting to shared storage for multi-instance deployments.
 - Enable database backups and move off the temporary/free database before its expiry.
