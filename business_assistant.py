@@ -534,7 +534,7 @@ class Handler(BaseHTTPRequestHandler):
                 expires=None
                 database.create_session(hashlib.sha256(token.encode("utf-8")).hexdigest(),user_id,expires)
                 self.send_response(201)
-                self.send_header("Set-Cookie","session="+token+"; HttpOnly; SameSite=Lax; Path=/; Expires=Fri, 31 Dec 2099 23:59:59 GMT")
+                self.send_header("Set-Cookie","session="+token+"; HttpOnly; SameSite=Lax; Path=/; Secure; Expires=Fri, 31 Dec 2099 23:59:59 GMT")
                 self.send_header("Content-Type","application/json; charset=utf-8")
                 body=json.dumps({"success":True,"email":email},ensure_ascii=False).encode("utf-8")
                 self.send_header("Content-Length",str(len(body))); self.end_headers(); self.wfile.write(body); return
@@ -563,7 +563,7 @@ class Handler(BaseHTTPRequestHandler):
                 if token and database_enabled():
                     database.revoke_session(hashlib.sha256(token.encode("utf-8")).hexdigest())
                 self.send_response(200)
-                self.send_header("Set-Cookie","session=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0")
+                self.send_header("Set-Cookie","session=; HttpOnly; SameSite=Lax; Path=/; Secure; Max-Age=0")
                 self.send_header("Content-Type","application/json; charset=utf-8")
                 body=b'{"success":true}'
                 self.send_header("Content-Length",str(len(body))); self.end_headers(); self.wfile.write(body); return
