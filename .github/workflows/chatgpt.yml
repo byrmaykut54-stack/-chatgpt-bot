@@ -38,11 +38,11 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           python3 - <<'PY'
-          import json, os, urllib.request
+          import json, os, urllib.request, urllib.error
 
           diff = open("pr_diff.txt", "r", encoding="utf-8").read()
           if not diff.strip():
-              review = "Gemini Code Review: No code changes were found to review."
+              review = "## Gemini Code Review\n\nNo code changes were found to review."
           else:
               prompt = """You are a senior software engineer performing a GitHub pull request code review.
 
@@ -76,9 +76,13 @@ PR DIFF:
                   method="POST"
               )
 
-              with urllib.request.urlopen(req, timeout=120) as r:
-                  data = json.load(r)
-              review = data["candidates"][0]["content"]["parts"][0]["text"]
+              try:
+                  with urllib.request.urlopen(req, timeout=120) as r:
+                      data = json.load(r)
+                  review = data["candidates"][0]["content"]["parts"][0]["text"]
+              except urllib.error.HTTPError as e:
+                  body = e.read().decode("utf-8", errors="replace")
+                  raise SystemExit(f"Gemini API error {e.code}: {body}")
 
           open("review.md", "w", encoding="utf-8").write(review)
           PY
