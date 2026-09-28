@@ -3,3 +3,6 @@ __pycache__/
 *.pyc
 .venv/
 venv/
+*.db
+customer_data/
+appointments.local.json
