@@ -5,43 +5,84 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>AI İşletme Asistanı</title>
 <style>
-body{font-family:Arial,sans-serif;max-width:760px;margin:0 auto;padding:20px;background:#f5f5f5;color:#222}
-.card{background:#fff;border-radius:16px;padding:20px;box-shadow:0 4px 18px #0001}
-h1{margin-top:0}.muted{color:#666}.chat{min-height:260px;margin:20px 0;padding:12px;background:#fafafa;border-radius:12px;overflow:auto}
+body{font-family:Arial,sans-serif;max-width:900px;margin:0 auto;padding:16px;background:#f5f5f5;color:#222}
+.card{background:#fff;border-radius:16px;padding:18px;margin-bottom:16px;box-shadow:0 4px 18px #0001}
+h1,h2{margin-top:0}.muted{color:#666}.chat{min-height:240px;margin:16px 0;padding:12px;background:#fafafa;border-radius:12px;overflow:auto}
 .msg{padding:10px 12px;margin:8px 0;border-radius:12px;white-space:pre-wrap}.user{background:#e9f2ff}.bot{background:#eef8ee}
-form{display:flex;gap:8px}input{flex:1;padding:13px;border:1px solid #ddd;border-radius:10px;font-size:16px}button{padding:13px 18px;border:0;border-radius:10px;cursor:pointer}
+form{display:flex;gap:8px}input,select{flex:1;padding:12px;border:1px solid #ddd;border-radius:10px;font-size:16px}button{padding:12px 16px;border:0;border-radius:10px;cursor:pointer}
+table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:9px;border-bottom:1px solid #eee;font-size:14px}
 </style>
 </head>
 <body>
 <div class="card">
 <h1>🤖 AI İşletme Asistanı</h1>
 <div id="business" class="muted">İşletme bilgileri yükleniyor...</div>
+</div>
+
+<div class="card">
+<h2>💬 Müşteri Asistanı</h2>
 <div id="chat" class="chat"></div>
 <form id="form">
-<input id="message" placeholder="Müşteri mesajını yazın..." autocomplete="off">
+<input id="message" placeholder="Örn: Yarın 18:00'de saç + sakal için yer var mı?" autocomplete="off">
 <button>Gönder</button>
 </form>
 </div>
+
+<div class="card">
+<h2>📅 Randevu Yönetimi</h2>
+<form id="appointmentForm">
+<input id="customer_name" placeholder="Müşteri adı" required>
+<input id="phone" placeholder="Telefon" required>
+<input id="date" type="date" required>
+<input id="time" type="time" required>
+<input id="service" placeholder="Hizmet" required>
+<button>Randevu Ekle</button>
+</form>
+<div id="appointments" style="margin-top:15px"></div>
+</div>
+
 <script>
 const chat=document.getElementById("chat");
-const business=document.getElementById("business");
 function add(text,cls){const d=document.createElement("div");d.className="msg "+cls;d.textContent=text;chat.appendChild(d);chat.scrollTop=chat.scrollHeight;}
+
 fetch("/api/business").then(r=>r.json()).then(b=>{
- business.textContent=b.business_name+" • "+b.sector+" • "+b.working_hours;
-}).catch(()=>business.textContent="İşletme bilgisi alınamadı.");
+ document.getElementById("business").textContent=b.business_name+" • "+b.sector+" • "+b.working_hours;
+}).catch(()=>document.getElementById("business").textContent="İşletme bilgisi alınamadı.");
+
 document.getElementById("form").addEventListener("submit",async e=>{
  e.preventDefault();
  const input=document.getElementById("message");
  const message=input.value.trim(); if(!message)return;
  add(message,"user"); input.value="";
- add("Yanıt hazırlanıyor...","bot");
- const pending=chat.lastChild;
+ add("Yanıt hazırlanıyor...","bot"); const pending=chat.lastChild;
  try{
-   const r=await fetch("/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message})});
-   const data=await r.json();
-   pending.textContent=data.reply||data.error||"Yanıt alınamadı.";
+  const r=await fetch("/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message})});
+  const data=await r.json(); pending.textContent=data.reply||data.error||"Yanıt alınamadı.";
  }catch(err){pending.textContent="Sunucuya bağlanılamadı.";}
 });
+
+async function loadAppointments(){
+ const r=await fetch("/api/appointments"); const items=await r.json();
+ if(!items.length){document.getElementById("appointments").innerHTML='<div class="muted">Henüz randevu yok.</div>';return;}
+ document.getElementById("appointments").innerHTML='<table><tr><th>Müşteri</th><th>Tarih</th><th>Saat</th><th>Hizmet</th><th>Durum</th></tr>'+
+ items.map(x=>'<tr><td>'+escapeHtml(x.customer_name)+'</td><td>'+escapeHtml(x.date)+'</td><td>'+escapeHtml(x.time)+'</td><td>'+escapeHtml(x.service)+'</td><td>'+escapeHtml(x.status)+'</td></tr>').join('')+'</table>';
+}
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));}
+
+document.getElementById("appointmentForm").addEventListener("submit",async e=>{
+ e.preventDefault();
+ const data={
+  customer_name:document.getElementById("customer_name").value,
+  phone:document.getElementById("phone").value,
+  date:document.getElementById("date").value,
+  time:document.getElementById("time").value,
+  service:document.getElementById("service").value
+ };
+ const r=await fetch("/api/appointments",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(data)});
+ if(r.ok){e.target.reset();loadAppointments();alert("Randevu kaydedildi.");}
+ else{const x=await r.json();alert(x.error||"Randevu kaydedilemedi.");}
+});
+loadAppointments();
 </script>
 </body>
 </html>
