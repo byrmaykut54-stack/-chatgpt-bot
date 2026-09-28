@@ -54,5 +54,31 @@ class BusinessAssistantTests(unittest.TestCase):
         self.assertEqual(parsed["message_id"], "wamid.test")
 
 
+    def test_tenant_scoped_appointment_and_message_loaders(self):
+        class FakeDatabase:
+            def __init__(self):
+                self.enabled_value = True
+                self.appointments = {
+                    1: [{"id":"a1","customer_name":"Ali"}],
+                    2: [{"id":"b1","customer_name":"Veli"}],
+                }
+                self.messages = {
+                    1: [{"id":"m1","message":"A"}],
+                    2: [{"id":"m2","message":"B"}],
+                }
+            def enabled(self): return self.enabled_value
+            def load_appointments_by_business(self, business_id): return self.appointments[business_id]
+            def load_messages_by_business(self, business_id): return self.messages[business_id]
+
+        fake = FakeDatabase()
+        with patch.object(business_assistant, "database", fake):
+            self.assertEqual(business_assistant.load_appointments((10, 1))[0]["id"], "a1")
+            self.assertEqual(business_assistant.load_messages((10, 2))[0]["id"], "m2")
+            self.assertNotEqual(
+                business_assistant.load_appointments((10, 1))[0]["id"],
+                business_assistant.load_appointments((10, 2))[0]["id"]
+            )
+
+
 if __name__ == "__main__":
     unittest.main()
