@@ -797,6 +797,19 @@ class Handler(BaseHTTPRequestHandler):
             user=master_admin_required(self)
             if not user: return
             self.send_json(200,master_businesses()); return
+        if parsed.path == "/api/health/db":
+            configured=database_enabled()
+            reachable=False
+            error_type=""
+            if configured:
+                try:
+                    with database.connection() as conn:
+                        conn.execute("SELECT 1").fetchone()
+                    reachable=True
+                except Exception as exc:
+                    error_type=type(exc).__name__
+            self.send_json(200,{"database_configured":configured,"database_reachable":reachable,"error_type":error_type})
+            return
         if parsed.path == "/api/auth/status":
             user=current_user(self)
             payload={"authenticated":bool(user),"email":user[2] if user else ""}
