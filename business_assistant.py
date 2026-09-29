@@ -1198,14 +1198,6 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(201, appointment); return
 
             if self.path == "/api/appointments/status":
-
-                    self.send_json(403,{"error":"Randevu işlemi yapma yetkiniz yok."}); return
-                appointment, error = create_appointment(data, user)
-                if not appointment:
-                    self.send_json(409 if error and "başka bir randevu" in error else 400, {"error": error or "Randevu oluşturulamadı"}); return
-                self.send_json(201, appointment); return
-
-            if self.path == "/api/appointments/status":
                 user=auth_required(self)
                 if not user: return
                 if not user_can(user,"appointments"):
