@@ -127,6 +127,29 @@ async function loadSubscription(){
  btn.textContent=plan==="PRO"?"Aboneliği İptal Et":"Pro'ya Geç";
  btn.onclick=async()=>{const endpoint=plan==="PRO"?"/api/billing/cancel":"/api/billing/start"; const r=await fetch(endpoint,{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"}); const x=await r.json().catch(()=>({})); if(r.ok&&x.checkout_form_content){document.open();document.write('<!doctype html><html lang="tr"><head><meta charset="utf-8"><title>NEXORA Pro</title></head><body><div id="iyzico-checkout-form" class="responsive"></div>'+x.checkout_form_content+'</body></html>');document.close();return;} if(r.ok&&x.checkout_url){window.location.href=x.checkout_url;return;} if(r.ok){alert("İşlem tamamlandı.");loadSubscription();return;} alert(x.error||"İşlem gerçekleştirilemedi.");};
 }
+function appointmentNotification(appointment,title="Yeni randevu"){
+  try{
+    if(!("Notification" in window)||Notification.permission!=="granted") return;
+    const body=(appointment.customer_name||"Müşteri")+" • "+(appointment.date||"")+" "+(appointment.time||"");
+    new Notification(title,{body});
+  }catch(e){}
+}
+async function enableNotifications(){
+  try{
+    if(!("Notification" in window)){alert("Bu tarayıcı bildirimleri desteklemiyor.");return;}
+    const permission=await Notification.requestPermission();
+    if(permission==="granted") alert("Bildirimler açıldı.");
+    else alert("Bildirim izni verilmedi.");
+  }catch(e){alert("Bildirimler açılamadı.");}
+}
+function checkAppointmentNotifications(items){
+  try{
+    const todayItems=Array.isArray(items)?items.filter(x=>x.date===today&&x.status!=="cancelled"):[];
+    localStorage.setItem("nexora-notification-count",String(todayItems.length));
+  }catch(e){}
+}
+function checkUpcomingReminders(items){}
+
 async function loadDashboard(){
  const [ar,mr,cr,rr]=await Promise.all([fetch("/api/appointments"),fetch("/api/messages"),fetch("/api/customers"),fetch("/api/reports")]);const items=ar.ok?await ar.json():[],messages=mr.ok?await mr.json():[],customers=cr.ok?await cr.json():[],report=rr.ok?await rr.json():null;
  checkAppointmentNotifications(items); checkUpcomingReminders(items);
@@ -178,7 +201,12 @@ async function authInit(){
       r=await fetch(mode==="register"?"/api/auth/register":"/api/auth/login",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
     }catch(err){document.getElementById("authError").textContent="Sunucuya bağlanılamadı. Lütfen tekrar deneyin.";return;}
     const x=await r.json().catch(()=>({}));
-    if(!r.ok){document.getElementById("authError").textContent=x.error||"İşlem başarısız.";return;}
+    if(!r.ok){
+       if(r.status===401){document.getElementById("authError").textContent="Yanlış e-posta veya şifre. Lütfen kayıt olun.";}
+       else if(r.status===429){document.getElementById("authError").textContent=x.error||"Çok fazla giriş denemesi. Lütfen kısa süre sonra tekrar deneyin.";}
+       else {document.getElementById("authError").textContent=x.error||"İşlem başarısız.";}
+       return;
+     }
     const check=await fetch("/api/auth/status",{credentials:"same-origin"}).then(v=>v.json()).catch(()=>({authenticated:false}));
     if(!check.authenticated){document.getElementById("authError").textContent="Giriş başarılı ancak oturum oluşturulamadı. Lütfen tekrar deneyin.";return;}
     document.getElementById("authError").textContent="";
