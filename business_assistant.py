@@ -89,13 +89,37 @@ def verify_password(password, stored):
         return False
 
 def send_email(to_address, subject, body):
+    """Send transactional mail via Resend when configured, otherwise SMTP."""
+    resend_key=os.environ.get("RESEND_API_KEY","").strip()
+    resend_from=os.environ.get("RESEND_FROM","").strip()
+    if resend_key and resend_from:
+        try:
+            payload=json.dumps({"from":resend_from,"to":[to_address],"subject":subject,"text":body}).encode("utf-8")
+            req=urllib.request.Request(
+                "https://api.resend.com/emails",
+                data=payload,
+                headers={"Authorization":"Bearer "+resend_key,"Content-Type":"application/json"},
+                method="POST"
+            )
+            with urllib.request.urlopen(req,timeout=20) as response:
+                result=json.load(response)
+            print("EMAIL_OK: Resend delivery request accepted", flush=True)
+            return True
+        except Exception as exc:
+            print(f"EMAIL_ERROR: Resend {type(exc).__name__}: {exc}", flush=True)
+            return False
+
     host=os.environ.get("SMTP_HOST","").strip()
-    port=int(os.environ.get("SMTP_PORT","587") or 587)
+    try:
+        port=int(os.environ.get("SMTP_PORT","587") or 587)
+    except ValueError:
+        print("EMAIL_ERROR: SMTP_PORT geçersiz", flush=True)
+        return False
     username=os.environ.get("SMTP_USERNAME","").strip()
     password=os.environ.get("SMTP_PASSWORD","")
     sender=os.environ.get("SMTP_FROM",username).strip()
     if not host or not sender:
-        print("EMAIL_ERROR: SMTP_HOST veya SMTP_FROM eksik", flush=True)
+        print("EMAIL_ERROR: RESEND_API_KEY/RESEND_FROM veya SMTP_HOST/SMTP_FROM eksik", flush=True)
         return False
     msg=EmailMessage()
     msg["From"]=sender
@@ -103,15 +127,23 @@ def send_email(to_address, subject, body):
     msg["Subject"]=subject
     msg.set_content(body)
     try:
-        with smtplib.SMTP(host,port,timeout=20) as smtp:
-            smtp.starttls()
-            if username:
-                smtp.login(username,password)
-            smtp.send_message(msg)
-        print("EMAIL_OK: password reset email sent", flush=True)
+        if port == 465:
+            with smtplib.SMTP_SSL(host,port,timeout=20) as smtp:
+                if username:
+                    smtp.login(username,password)
+                smtp.send_message(msg)
+        else:
+            with smtplib.SMTP(host,port,timeout=20) as smtp:
+                smtp.ehlo()
+                smtp.starttls()
+                smtp.ehlo()
+                if username:
+                    smtp.login(username,password)
+                smtp.send_message(msg)
+        print("EMAIL_OK: SMTP delivery request accepted", flush=True)
         return True
     except Exception as exc:
-        print(f"EMAIL_ERROR: {type(exc).__name__}: {exc}", flush=True)
+        print(f"EMAIL_ERROR: SMTP {type(exc).__name__}: {exc}", flush=True)
         return False
 
 def frontend_base_url():
@@ -1112,7 +1144,8 @@ class Handler(BaseHTTPRequestHandler):
                     database.create_password_reset_token(token_hash,user[0],datetime.now(timezone.utc)+timedelta(minutes=30))
                     base=frontend_base_url()
                     if base:
-                        send_email(user[2],"NEXORA şifre sıfırlama",f"NEXORA şifrenizi yenilemek için bağlantı:\n{base}/?reset_token={token}\n\nBağlantı 30 dakika geçerlidir.")
+                        if not send_email(user[2],"NEXORA şifre sıfırlama",f"NEXORA şifrenizi yenilemek için bağlantı:\n{base}/?reset_token={token}\n\nBağlantı 30 dakika geçerlidir."):
+                            print("PASSWORD_RESET_EMAIL_FAILED: SMTP/Resend yapılandırması veya gönderim başarısız.", flush=True)
                 self.send_json(200,{"success":True,"message":"Eğer hesap varsa sıfırlama bağlantısı e-posta adresinize gönderildi."}); return
 
             if self.path == "/api/auth/reset-password":
