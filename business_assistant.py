@@ -163,6 +163,40 @@ def usage_payload(business_id):
     used=database.get_usage_summary(business_id)
     return {"plan":plan,"limits":limits,"used":used,"remaining":{k:max(v-used.get(k,0),0) for k,v in limits.items()}}
 
+def master_admin_allowed(user):
+    """NEXORA platform owner access is restricted to one configured email."""
+    if not user:
+        return False
+    admin_email=os.environ.get("NEXORA_ADMIN_EMAIL","").strip().lower()
+    return bool(admin_email) and str(user[2]).strip().lower()==admin_email and str(user[3]).strip().lower()=="owner"
+
+def master_admin_required(handler):
+    user=current_user(handler)
+    if not user:
+        handler.send_json(401,{"error":"Giriş yapmanız gerekiyor."})
+        return None
+    if not master_admin_allowed(user):
+        handler.send_json(403,{"error":"NEXORA Master Panel yetkiniz yok."})
+        return None
+    return user
+
+def master_stats():
+    if not database_enabled():
+        return {"businesses":0,"users":0,"appointments":0,"messages":0,"active_subscriptions":0}
+    with database.connection() as conn:
+        businesses=conn.execute("SELECT COUNT(*) FROM businesses").fetchone()[0]
+        users=conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+        appointments=conn.execute("SELECT COUNT(*) FROM appointments").fetchone()[0]
+        messages=conn.execute("SELECT COUNT(*) FROM messages").fetchone()[0]
+        active=conn.execute("SELECT COUNT(*) FROM businesses WHERE status='active'").fetchone()[0]
+    return {"businesses":businesses,"users":users,"appointments":appointments,"messages":messages,"active_businesses":active}
+
+def master_businesses():
+    if not database_enabled(): return []
+    with database.connection() as conn:
+        rows=conn.execute("SELECT b.id,b.name,b.plan,b.status,b.trial_ends_at,b.created_at,(SELECT COUNT(*) FROM users u WHERE u.business_id=b.id),(SELECT COUNT(*) FROM appointments a WHERE a.business_id=b.id) FROM businesses b ORDER BY b.created_at DESC").fetchall()
+    return [{"id":r[0],"name":r[1],"plan":r[2],"status":r[3],"trial_ends_at":r[4].isoformat() if r[4] else None,"created_at":r[5].isoformat() if r[5] else None,"users":r[6],"appointments":r[7]} for r in rows]
+
 def auth_required(handler):
     user = current_user(handler)
     if not user:
@@ -684,6 +718,18 @@ class Handler(BaseHTTPRequestHandler):
             body='<!doctype html><html lang="tr"><head><meta charset="utf-8"><title>NEXORA Ödeme</title></head><body style="font-family:Arial;padding:40px;text-align:center"><h2>NEXORA</h2><p>Ödeme sonucu kontrol ediliyor...</p><script>fetch("/api/billing/complete",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({token:'+safe+'})}).then(()=>location.href="/").catch(()=>location.href="/");</script></body></html>'
             self.send_response(200); self.send_header("Content-Type","text/html; charset=utf-8"); self.send_header("Content-Length",str(len(body.encode("utf-8")))); self.end_headers(); self.wfile.write(body.encode("utf-8")); return
 
+        if parsed.path == "/api/master/status":
+            user=master_admin_required(self)
+            if not user: return
+            self.send_json(200,{"enabled":True,"email":user[2]}); return
+        if parsed.path == "/api/master/stats":
+            user=master_admin_required(self)
+            if not user: return
+            self.send_json(200,master_stats()); return
+        if parsed.path == "/api/master/businesses":
+            user=master_admin_required(self)
+            if not user: return
+            self.send_json(200,master_businesses()); return
         if parsed.path == "/api/auth/status":
             user=current_user(self)
             payload={"authenticated":bool(user),"email":user[2] if user else ""}
