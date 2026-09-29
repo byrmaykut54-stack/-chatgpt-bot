@@ -1203,7 +1203,7 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_json(400,{"error":"Mevcut şifrenizi girin."}); return
                 if confirm != "SİL":
                     self.send_json(400,{"error":"Silme işlemini onaylamak için SİL yazmalısınız."}); return
-                if not verify_password(password,user[3] if False else database.get_user_by_email(user[2])[3]):
+                account=database.get_user_by_email(user[2])\n                if not account or not verify_password(password,account[3]):
                     self.send_json(401,{"error":"Mevcut şifre hatalı."}); return
                 if database_enabled():
                     sub=database.get_business_subscription(user[1])
