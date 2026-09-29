@@ -176,7 +176,10 @@ async function authInit(){
     const r=await fetch(mode==="register"?"/api/auth/register":"/api/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
     const x=await r.json().catch(()=>({}));
     if(!r.ok){document.getElementById("authError").textContent=x.error||"İşlem başarısız.";return;}
-    location.reload();
+    document.getElementById("authError").textContent="";
+    document.getElementById("authScreen").style.display="none";
+    document.getElementById("app").style.display="block";
+    loadSubscription();loadUsage();loadAudit();loadDashboard();loadMasterPanel();loadBusinessSettings();loadTeam();
   });
 }
 handleAuthTokens().then(authInit);
