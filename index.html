@@ -53,7 +53,7 @@ input{width:100%;padding:12px 13px;border:1px solid #e0e5ea;background:#fbfcfd;b
   <div style="font-size:12px;font-weight:800;color:#344054;margin-bottom:6px">Şifre sıfırlama</div>
   <div style="font-size:11px;color:#667085;margin-bottom:8px">Hesabınızdaki e-posta adresini girin. Sıfırlama bağlantısı e-postanıza gönderilecek.</div>
   <input id="forgotEmail" type="email" placeholder="ornek@isletme.com" autocomplete="email">
-  <button id="forgotSendBtn" class="primary full" type="button">Sıfırlama Bağlantısı Gönder</button>
+  <button id="forgotSendBtn" class="primary full" type="button" onclick="nxSendForgotPassword()">Sıfırlama Bağlantısı Gönder</button>
   <div id="forgotStatus" style="font-size:11px;margin-top:8px"></div>
 </div>
 <button class="primary full" type="submit">Giriş Yap</button>
@@ -250,6 +250,19 @@ async function getAuthStatus(retries=5){
     if(attempt<retries-1) await new Promise(resolve=>setTimeout(resolve,1500));
   }
   return last;
+}
+async function nxSendForgotPassword(){
+ const email=(document.getElementById("forgotEmail")?.value||"").trim();
+ const st=document.getElementById("forgotStatus");
+ if(!st)return;
+ if(!email||!email.includes("@")){st.style.color="#9b2420";st.textContent="Geçerli bir e-posta adresi girin.";return;}
+ st.style.color="#667085";st.textContent="Gönderiliyor...";
+ try{
+  const r=await fetch("/api/auth/forgot-password",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({email})});
+  const x=await r.json().catch(()=>({}));
+  st.style.color=r.ok?"#18733d":"#9b2420";
+  st.textContent=x.message||x.error||(r.ok?"İşlem tamamlandı.":"Gönderim başarısız.");
+ }catch(e){st.style.color="#9b2420";st.textContent="Sunucuya bağlanılamadı. Lütfen tekrar deneyin.";}
 }
 async function authInit(){
   const status=await getAuthStatus();
