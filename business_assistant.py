@@ -407,6 +407,20 @@ def create_appointment(data, user=None):
     if any(not appointment[x] for x in required):
         return None, "customer_name, phone, date, time ve service zorunlu"
 
+    config = business_config_for_user(user) if user else load_config()
+    try:
+        requested_date = datetime.strptime(appointment["date"], "%Y-%m-%d").date()
+    except ValueError:
+        return None, "Geçerli bir tarih seçin."
+    if requested_date < datetime.now().date():
+        return None, "Geçmiş bir tarihe randevu oluşturulamaz."
+    if is_closed_day(appointment["date"], config):
+        return None, "Seçilen gün işletme kapalı."
+    if not re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", appointment["time"]):
+        return None, "Geçerli bir saat seçin."
+    if not is_time_available(appointment["date"], appointment["time"], config, user):
+        return None, "Seçilen tarih ve saat uygun değil."
+
     items = load_appointments(user)
     active = {"pending", "confirmed"}
     conflict = next((item for item in items if item.get("date") == appointment["date"] and item.get("time") == appointment["time"] and item.get("status") in active), None)
@@ -425,9 +439,20 @@ def appointment_time_from_text(text):
     minute = int(match.group(2) or "00")
     return f"{hour:02d}:{minute:02d}"
 
+def resolve_relative_date(text):
+    today = datetime.now().date()
+    if "bugün" in text:
+        return today.strftime("%Y-%m-%d")
+    if "yarın" in text:
+        return (today + timedelta(days=1)).strftime("%Y-%m-%d")
+    if "öbür gün" in text:
+        return (today + timedelta(days=2)).strftime("%Y-%m-%d")
+    return ""
+
 def local_intent_hint(message, config):
     text = message.lower()
     time_text = appointment_time_from_text(text)
+    date_text = resolve_relative_date(text)
     appointment_words = ("randevu", "rezervasyon", "uygun saat", "saat", "boş mu", "boş", "müsait", "uygun")
     if any(word in text for word in appointment_words):
         service = ""
@@ -437,12 +462,13 @@ def local_intent_hint(message, config):
                 service = name
                 break
 
-        today = datetime.now().strftime("%Y-%m-%d") if time_text and any(word in text for word in ("boş", "müsait", "uygun")) else ""
+        date_value = date_text or (datetime.now().strftime("%Y-%m-%d") if time_text and any(word in text for word in ("boş", "müsait", "uygun")) else "")
 
         return {
-            "intent": "availability" if any(word in text for word in ("boş", "müsait", "uygun")) else "appointment",            "customer_name": "",
+            "intent": "availability" if any(word in text for word in ("boş", "müsait", "uygun")) else "appointment",
+            "customer_name": "",
             "phone": "",
-            "date": today,
+            "date": date_value,
             "time": time_text,
             "service": service,
             "note": ""
