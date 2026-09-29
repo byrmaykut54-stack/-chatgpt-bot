@@ -159,10 +159,10 @@ async function loadMasterPanel(){
 document.getElementById("masterRefreshBtn")?.addEventListener("click",loadMasterPanel);
 
 async function authInit(){
-  const status=await fetch("/api/auth/status").then(r=>r.json()).catch(()=>({authenticated:false}));
+  const status=await fetch("/api/auth/status",{credentials:"same-origin"}).then(r=>r.json()).catch(()=>({authenticated:false}));
   const screen=document.getElementById("authScreen"), app=document.getElementById("app");
   if(status.authenticated){screen.style.display="none";app.style.display="block";loadSubscription();loadUsage();loadAudit();loadDashboard();loadMasterPanel();return;}
-  const setup=await fetch("/api/auth/setup-available").then(r=>r.json()).catch(()=>({available:false}));
+  const setup=await fetch("/api/auth/setup-available",{credentials:"same-origin"}).then(r=>r.json()).catch(()=>({available:false}));
   const setupBtn=document.getElementById("setupBtn"), business=document.getElementById("authBusiness"), form=document.getElementById("authForm");
   setupBtn.style.display="block";
   document.getElementById("forgotBtn").onclick=()=>{const p=document.getElementById("forgotPanel");p.style.display=p.style.display==="none"?"block":"none";const e=document.getElementById("forgotEmail");if(p.style.display==="block"){e.value=document.getElementById("authEmail").value||"";setTimeout(()=>e.focus(),50);}};
@@ -173,9 +173,14 @@ async function authInit(){
     e.preventDefault();const mode=form.dataset.mode||"login";
     const body={email:document.getElementById("authEmail").value,password:document.getElementById("authPassword").value};
     if(mode==="register")body.business_name=business.value.trim()||"Demo İşletme";
-    const r=await fetch(mode==="register"?"/api/auth/register":"/api/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+    let r;
+    try{
+      r=await fetch(mode==="register"?"/api/auth/register":"/api/auth/login",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+    }catch(err){document.getElementById("authError").textContent="Sunucuya bağlanılamadı. Lütfen tekrar deneyin.";return;}
     const x=await r.json().catch(()=>({}));
     if(!r.ok){document.getElementById("authError").textContent=x.error||"İşlem başarısız.";return;}
+    const check=await fetch("/api/auth/status",{credentials:"same-origin"}).then(v=>v.json()).catch(()=>({authenticated:false}));
+    if(!check.authenticated){document.getElementById("authError").textContent="Giriş başarılı ancak oturum oluşturulamadı. Lütfen tekrar deneyin.";return;}
     document.getElementById("authError").textContent="";
     document.getElementById("authScreen").style.display="none";
     document.getElementById("app").style.display="block";
