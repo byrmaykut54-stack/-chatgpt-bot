@@ -60,7 +60,7 @@ input{width:100%;padding:12px 13px;border:1px solid #e0e5ea;background:#fbfcfd;b
 <input id="teamEmail" type="email" placeholder="Çalışan e-postası" required>
 <input id="teamPassword" type="password" placeholder="Geçici şifre (en az 8 karakter)" minlength="8" required>
 <button class="primary full">Çalışan Hesabı Oluştur</button>
-</form><div id="teamStatus" class="muted" style="margin:8px 0"></div><div id="teamPermissions" style="margin-top:12px"></div><div id="teamList" class="muted">Yükleniyor...</div></div><div class="card"><h2>⚙️ İşletme Ayarları</h2><form id="businessForm">
+</form><div id="teamStatus" class="muted" style="margin:8px 0"></div><div id="teamPermissions" style="margin-top:12px"></div><div id="teamList" class="muted">Yükleniyor...</div></div><div class="card"><h2>⚙️ İşletme Ayarları</h2><div style="margin-bottom:12px;padding:12px;border:1px solid #e5e7eb;border-radius:10px"><div style="font-weight:800;margin-bottom:5px">📅 Google Calendar</div><div id="calendarStatus" class="muted" style="margin-bottom:8px">Bağlantı kontrol ediliyor...</div><div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="install" id="calendarConnectBtn">Google Calendar Bağla</button><button type="button" class="install" id="calendarSyncBtn">Şimdi Senkronize Et</button><button type="button" class="install" id="calendarDisconnectBtn">Bağlantıyı Kaldır</button></div></div><form id="businessForm">
 <input id="cfgName" placeholder="İşletme adı" required><input id="cfgSector" placeholder="Sektör" required>
 <input id="cfgHours" placeholder="Çalışma saatleri: 09:00-18:00" required><input id="cfgAddress" placeholder="Adres">
 <input id="cfgClosed" placeholder="Kapalı günler: Pazar">
@@ -149,6 +149,13 @@ async function authInit(){
 handleAuthTokens().then(authInit);
 setInterval(()=>{if(document.getElementById("app").style.display!=="none")loadDashboard();},30000);
 const businessForm=document.getElementById("businessForm");
+async function loadCalendarStatus(){
+ const r=await fetch("/api/calendar/status"); if(!r.ok)return; const x=await r.json(); const el=document.getElementById("calendarStatus"); if(!el)return; el.textContent=x.connected?"🟢 "+(x.calendar_name||"Google Calendar")+" bağlı.":"⚪ Google Calendar bağlı değil.";
+}
+document.getElementById("calendarConnectBtn").addEventListener("click",async()=>{const r=await fetch("/api/calendar/connect");const x=await r.json().catch(()=>({}));if(r.ok&&x.url)location.href=x.url;else alert(x.error||"Google Calendar bağlantısı başlatılamadı.");});
+document.getElementById("calendarSyncBtn").addEventListener("click",async()=>{const r=await fetch("/api/calendar/sync",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"});const x=await r.json().catch(()=>({}));alert(r.ok?"Google Calendar senkronizasyonu tamamlandı.":(x.error||"Senkronizasyon başarısız."));loadCalendarStatus();});
+document.getElementById("calendarDisconnectBtn").addEventListener("click",async()=>{if(!confirm("Google Calendar bağlantısı kaldırılsın mı?"))return;const r=await fetch("/api/calendar/disconnect",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"});const x=await r.json().catch(()=>({}));if(!r.ok)alert(x.error||"Bağlantı kaldırılamadı.");loadCalendarStatus();});
+loadCalendarStatus();
 async function loadBusinessSettings(){
  const r=await fetch("/api/business"); if(!r.ok)return; const b=await r.json();
  document.getElementById("cfgName").value=b.business_name||""; document.getElementById("cfgSector").value=b.sector||"";
