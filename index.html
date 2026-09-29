@@ -44,6 +44,13 @@ input{width:100%;padding:12px 13px;border:1px solid #e0e5ea;background:#fbfcfd;b
 <label class="auth-label" for="authPassword">Şifre</label>
 <input id="authPassword" type="password" placeholder="••••••••" autocomplete="current-password" required>
 <div class="auth-row"><span></span><button id="forgotBtn" class="auth-link" type="button">Şifremi Unuttum</button></div>
+<div id="forgotPanel" style="display:none;margin:10px 0 12px;padding:12px;border:1px solid #e7eaee;border-radius:12px;background:#fff">
+  <div style="font-size:12px;font-weight:800;color:#344054;margin-bottom:6px">Şifre sıfırlama</div>
+  <div style="font-size:11px;color:#667085;margin-bottom:8px">Hesabınızdaki e-posta adresini girin. Sıfırlama bağlantısı e-postanıza gönderilecek.</div>
+  <input id="forgotEmail" type="email" placeholder="ornek@isletme.com" autocomplete="email">
+  <button id="forgotSendBtn" class="primary full" type="button">Sıfırlama Bağlantısı Gönder</button>
+  <div id="forgotStatus" style="font-size:11px;margin-top:8px"></div>
+</div>
 <button class="primary full" type="submit">Giriş Yap</button>
 </form>
 <div class="auth-divider"><span>veya</span></div>
@@ -158,7 +165,8 @@ async function authInit(){
   const setup=await fetch("/api/auth/setup-available").then(r=>r.json()).catch(()=>({available:false}));
   const setupBtn=document.getElementById("setupBtn"), business=document.getElementById("authBusiness"), form=document.getElementById("authForm");
   setupBtn.style.display="block";
-  document.getElementById("forgotBtn").onclick=async()=>{const email=prompt("NEXORA hesabınızdaki e-posta adresini girin:");if(!email)return;const r=await fetch("/api/auth/forgot-password",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email})});const x=await r.json().catch(()=>({}));alert(x.message||x.error||"İşlem tamamlandı.");};
+  document.getElementById("forgotBtn").onclick=()=>{const p=document.getElementById("forgotPanel");p.style.display=p.style.display==="none"?"block":"none";const e=document.getElementById("forgotEmail");if(p.style.display==="block"){e.value=document.getElementById("authEmail").value||"";setTimeout(()=>e.focus(),50);}};
+  document.getElementById("forgotSendBtn").onclick=async()=>{const email=document.getElementById("forgotEmail").value.trim();const st=document.getElementById("forgotStatus");if(!email||!email.includes("@")){st.style.color="#9b2420";st.textContent="Geçerli bir e-posta adresi girin.";return;}st.style.color="#667085";st.textContent="Gönderiliyor...";try{const r=await fetch("/api/auth/forgot-password",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email})});const x=await r.json().catch(()=>({}));st.style.color=r.ok?"#18733d":"#9b2420";st.textContent=x.message||x.error||"İşlem tamamlandı.";}catch(e){st.style.color="#9b2420";st.textContent="Sunucuya bağlanılamadı.";}};
 
   function switchToRegister(){business.style.display="block";business.required=true;form.querySelector("button").textContent="14 Günlük Denemeyi Başlat";setupBtn.style.display="none";form.dataset.mode="register";document.getElementById("authModeHint").innerHTML="Zaten hesabınız var mı? <button type="button" id="loginLink">Giriş yap</button>";document.getElementById("loginLink").onclick=switchToLogin;document.getElementById("authError").textContent="";} function switchToLogin(){business.style.display="none";business.required=false;form.querySelector("button").textContent="Giriş Yap";setupBtn.style.display="block";form.dataset.mode="login";document.getElementById("authModeHint").innerHTML="Hesabınız yok mu? <button type="button" id="registerLink">Yeni işletme hesabı oluştur</button>";document.getElementById("registerLink").onclick=switchToRegister;document.getElementById("authError").textContent="";} setupBtn.onclick=switchToRegister; document.getElementById("registerLink").onclick=switchToRegister;
   form.addEventListener("submit",async e=>{
