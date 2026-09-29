@@ -1110,7 +1110,7 @@ class Handler(BaseHTTPRequestHandler):
                 expires=None
                 database.create_session(hashlib.sha256(token.encode("utf-8")).hexdigest(),user[0],expires)
                 self.send_response(200)
-                self.send_header("Set-Cookie","session="+token+"; HttpOnly; SameSite=Lax; Path=/; Secure; Expires=Fri, 31 Dec 2099 23:59:59 GMT")
+                self.send_header("Set-Cookie","session="+token+"; HttpOnly; SameSite=Lax; Path=/; Secure; Max-Age=315360000")
                 self.send_header("Content-Type","application/json; charset=utf-8")
                 body=json.dumps({"success":True,"email":user[2]},ensure_ascii=False).encode("utf-8")
                 self.send_header("Content-Length",str(len(body))); self.end_headers(); self.wfile.write(body); return
