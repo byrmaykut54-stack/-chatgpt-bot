@@ -199,6 +199,26 @@ def ensure_schema():
         conn.execute("ALTER TABLE sessions ADD COLUMN IF NOT EXISTS revoked_at TIMESTAMPTZ")
         conn.commit()
 
+def delete_users_by_email_prefix(prefix):
+    """Delete accounts and their businesses for a one-time administrative cleanup."""
+    prefix = str(prefix or "").strip().lower()
+    if not prefix:
+        return 0
+    with connection() as conn:
+        rows = conn.execute("SELECT id, business_id FROM users WHERE lower(email) LIKE %s", (prefix + "%",)).fetchall()
+        business_ids = sorted({row[1] for row in rows})
+        deleted = 0
+        for business_id in business_ids:
+            other_users = conn.execute("SELECT COUNT(*) FROM users WHERE business_id=%s AND lower(email) NOT LIKE %s", (business_id, prefix + "%")).fetchone()[0]
+            if int(other_users) == 0:
+                conn.execute("DELETE FROM businesses WHERE id=%s", (business_id,))
+            else:
+                conn.execute("DELETE FROM users WHERE business_id=%s AND lower(email) LIKE %s", (business_id, prefix + "%"))
+            deleted += sum(1 for row in rows if row[1] == business_id)
+        conn.execute("DELETE FROM rate_limits WHERE key LIKE 'register:%'")
+        conn.commit()
+        return deleted
+
 def _fernet():
     key = os.environ.get("NEXORA_ENCRYPTION_KEY", "").strip()
     if not key or Fernet is None:
