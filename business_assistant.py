@@ -310,6 +310,10 @@ def business_config_for_user(user):
 def initialize_database():
     if database_enabled():
         database.ensure_schema()
+        cleanup_prefix = os.environ.get("NEXORA_DELETE_EMAIL_PREFIX", "").strip()
+        if cleanup_prefix:
+            deleted = database.delete_users_by_email_prefix(cleanup_prefix)
+            print(f"NEXORA one-time account cleanup: {deleted} account(s) removed for prefix {cleanup_prefix}")
         config = load_config()
         business_id = database.get_business_id(config)
         legacy_appointments = load_json(APPOINTMENTS_PATH, [])
