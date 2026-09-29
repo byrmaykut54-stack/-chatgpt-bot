@@ -1221,6 +1221,7 @@ class Handler(BaseHTTPRequestHandler):
                 if database.get_user_by_email(email):
                     self.send_json(409,{"error":"Bu e-posta zaten kayıtlı."}); return
                 uid=database.create_user(email,hash_password(password),user[1],role)
+                database.write_audit_log(user[1],user[0],"user_created","user",uid,{"email":email,"role":role})
                 self.send_json(201,{"id":uid,"email":email,"role":role}); return
 
             if self.path == "/api/users/delete":
@@ -1300,6 +1301,7 @@ class Handler(BaseHTTPRequestHandler):
                 config.pop("whatsapp_access_token", None)
                 config.pop("whatsapp_phone_number_id", None)
                 database.update_business(user[1], str(config["business_name"]), config)
+                database.write_audit_log(user[1],user[0],"business_settings_updated","business",user[1],{"business_name":config.get("business_name","")})
                 saved=dict(config)
                 saved["whatsapp_phone_number_id"]=database.get_business_whatsapp(user[1]).get("phone_number_id","")
                 saved["whatsapp_connected"]=bool(database.get_business_whatsapp(user[1]).get("phone_number_id") and database.get_business_whatsapp(user[1]).get("access_token"))
@@ -1316,6 +1318,7 @@ class Handler(BaseHTTPRequestHandler):
                 if not appointment:
                     self.send_json(409 if error and "başka bir randevu" in error else 400, {"error": error or "Randevu oluşturulamadı"}); return
                 database.increment_usage(user[1],"appointments")
+                database.write_audit_log(user[1],user[0],"appointment_created","appointment",appointment.get("id"),{"date":appointment.get("date"),"time":appointment.get("time"),"service":appointment.get("service")})
                 if google_calendar:
                     try: google_calendar.sync_appointment(user[1],appointment)
                     except Exception: pass
