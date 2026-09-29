@@ -20,6 +20,10 @@ try:
     import database
 except ImportError:
     database = None
+try:
+    import google_calendar
+except ImportError:
+    google_calendar = None
 
 DEFAULT_CONFIG = {
     "business_name": "Demo İşletme",
@@ -691,6 +695,32 @@ class Handler(BaseHTTPRequestHandler):
         if parsed.path == "/api/plans":
             price=os.environ.get("NEXORA_PRO_PRICE","").strip()
             self.send_json(200,{"plans":[{"id":"trial","name":"14 Gün Deneme","price":0,"features":["Randevu yönetimi","Müşteri yönetimi","AI müşteri asistanı","Ekip ve yetkiler"]},{"id":"pro","name":"NEXORA Pro","price":price or None,"price_note":"" if price else "Fiyatlandırma yapılandırılıyor","features":["Tüm deneme özellikleri","WhatsApp entegrasyonu","Gelişmiş raporlar","Öncelikli destek"]}]}); return
+        if parsed.path == "/oauth/google/callback":
+            q=parse_qs(parsed.query); state=(q.get("state") or [""])[0]; code=(q.get("code") or [""])[0]
+            if not state or not code or not google_calendar:
+                self.send_response(302); self.send_header("Location","/?calendar_error=1"); self.end_headers(); return
+            try:
+                google_calendar.connect_from_callback(state,code)
+                self.send_response(302); self.send_header("Location","/?calendar_connected=1"); self.end_headers(); return
+            except Exception:
+                self.send_response(302); self.send_header("Location","/?calendar_error=1"); self.end_headers(); return
+
+        if parsed.path == "/api/calendar/status":
+            user=auth_required(self)
+            if not user: return
+            if not user_can(user,"business_settings"):
+                self.send_json(403,{"error":"İşletme ayarlarına erişim yetkiniz yok."}); return
+            self.send_json(200,google_calendar.status(user[1]) if google_calendar else {"connected":False}); return
+
+        if parsed.path == "/api/calendar/connect":
+            user=auth_required(self)
+            if not user: return
+            if user[3] != "owner":
+                self.send_json(403,{"error":"Sadece işletme sahibi Google Calendar bağlayabilir."}); return
+            if not google_calendar or not google_calendar.configured():
+                self.send_json(503,{"error":"Google Calendar OAuth ayarları henüz yapılandırılmadı.","setup_required":True}); return
+            self.send_json(200,{"url":google_calendar.authorization_url(user[1],user[0])}); return
+
         if parsed.path == "/api/subscription":
             user=auth_required(self)
             if not user: return
@@ -808,6 +838,26 @@ class Handler(BaseHTTPRequestHandler):
                 except Exception as exc:
                     self.send_json(500, {"error": "Hatırlatma worker çalıştırılamadı.", "detail": str(exc)})
                 return
+
+            if self.path == "/api/calendar/disconnect":
+                user=auth_required(self)
+                if not user: return
+                if user[3] != "owner":
+                    self.send_json(403,{"error":"Sadece işletme sahibi bağlantıyı kaldırabilir."}); return
+                google_calendar.disconnect(user[1])
+                database.write_audit_log(user[1],user[0],"google_calendar_disconnected","calendar","",{})
+                self.send_json(200,{"success":True}); return
+
+            if self.path == "/api/calendar/sync":
+                user=auth_required(self)
+                if not user: return
+                if user[3] != "owner":
+                    self.send_json(403,{"error":"Sadece işletme sahibi senkronizasyon başlatabilir."}); return
+                if not google_calendar or not google_calendar.status(user[1]).get("connected"):
+                    self.send_json(400,{"error":"Google Calendar bağlı değil."}); return
+                results=google_calendar.sync_all(user[1],load_appointments(user))
+                database.write_audit_log(user[1],user[0],"google_calendar_synced","calendar","",{"count":len(results)})
+                self.send_json(200,{"success":True,"results":results}); return
 
             if self.path == "/api/billing/complete":
                 user=auth_required(self)
@@ -1142,6 +1192,9 @@ class Handler(BaseHTTPRequestHandler):
                 if not appointment:
                     self.send_json(409 if error and "başka bir randevu" in error else 400, {"error": error or "Randevu oluşturulamadı"}); return
                 database.increment_usage(user[1],"appointments")
+                if google_calendar:
+                    try: google_calendar.sync_appointment(user[1],appointment)
+                    except Exception: pass
                 self.send_json(201, appointment); return
 
             if self.path == "/api/appointments/status":
@@ -1166,6 +1219,9 @@ class Handler(BaseHTTPRequestHandler):
                     if item["id"] == appointment_id:
                         item["status"]=status
                         save_appointments(items,user)
+                        if google_calendar:
+                            try: google_calendar.sync_appointment(user[1],item)
+                            except Exception: pass
                         self.send_json(200,{"success":True}); return
                 self.send_json(404,{"error":"Randevu bulunamadı"}); return
 
