@@ -54,7 +54,7 @@ input{width:100%;padding:12px 13px;border:1px solid #e0e5ea;background:#fbfcfd;b
 <button class="primary full" type="submit">Giriş Yap</button>
 </form>
 <div class="auth-divider"><span>veya</span></div>
-<button id="setupBtn" class="full auth-secondary" type="button">Yeni İşletme Hesabı Oluştur</button>
+<button id="setupBtn" class="full auth-secondary" type="button" onclick="const b=document.getElementById('authBusiness');const f=document.getElementById('authForm');b.style.display='block';b.required=true;f.querySelector('button[type=submit]').textContent='14 Günlük Denemeyi Başlat';document.getElementById('setupBtn').style.display='none';f.dataset.mode='register';document.getElementById('authModeHint').innerHTML='Zaten hesabınız var mı? <button type=&quot;button&quot; id=&quot;loginLink&quot;>Giriş yap</button>';document.getElementById('loginLink').onclick=function(){location.reload()};document.getElementById('authError').textContent=''">Yeni İşletme Hesabı Oluştur</button>
 <div class="auth-toggle" id="authModeHint">Hesabınız yok mu? <button type="button" id="registerLink">Yeni işletme hesabı oluştur</button></div>
 <div class="auth-safe">Güvenli oturum · İşletme verileriniz yalnızca hesabınıza aittir</div>
 </div>
