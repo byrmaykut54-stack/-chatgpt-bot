@@ -612,6 +612,22 @@ def update_user_role(business_id,user_id,role):
         conn.commit()
 
 
+def delete_account(user_id, business_id):
+    """Permanently delete the signed-in owner's account and entire business workspace atomically."""
+    with connection() as conn:
+        row=conn.execute(
+            "SELECT id,email,role FROM users WHERE id=%s AND business_id=%s FOR UPDATE",
+            (user_id,business_id)
+        ).fetchone()
+        if not row:
+            return None
+        if row[2] != "owner":
+            raise PermissionError("Sadece işletme sahibi hesabını silebilir.")
+        # businesses is the root record; dependent records use ON DELETE CASCADE.
+        conn.execute("DELETE FROM businesses WHERE id=%s", (business_id,))
+        conn.commit()
+        return {"id":row[0],"email":row[1]}
+
 def delete_user(business_id, user_id):
     with connection() as conn:
         row=conn.execute("DELETE FROM users WHERE id=%s AND business_id=%s RETURNING id",(user_id,business_id)).fetchone()
