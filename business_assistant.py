@@ -898,6 +898,17 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(403,{"error":"Ekip bilgilerine erişim yetkiniz yok."}); return
             rows=database.list_users(user[1])
             self.send_json(200,[{"id":r[0],"email":r[1],"role":r[2],"created_at":r[3].isoformat() if hasattr(r[3],"isoformat") else str(r[3])} for r in rows]); return
+        if parsed.path == "/api/users/permissions" and self.command == "GET":
+            user=auth_required(self)
+            if not user: return
+            if user[3] != "owner":
+                self.send_json(403,{"error":"Sadece işletme sahibi yetkileri görüntüleyebilir."}); return
+            try: target=int(parse_qs(parsed.query).get("user_id",["0"])[0])
+            except Exception: target=0
+            target_user=database.get_user_in_business(user[1],target)
+            if not target_user:
+                self.send_json(404,{"error":"Çalışan bulunamadı"}); return
+            self.send_json(200,database.get_user_permissions(user[1],target) or {}); return
         if parsed.path == "/api/audit":
             user=auth_required(self)
             if not user:
