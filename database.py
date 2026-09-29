@@ -115,7 +115,7 @@ CREATE INDEX IF NOT EXISTS billing_checkout_business_idx ON billing_checkout_ses
 
 CREATE TABLE IF NOT EXISTS sessions (
     id BIGSERIAL PRIMARY KEY,
-    token_hash TEXT PRIMARY KEY,
+    token_hash TEXT NOT NULL UNIQUE,
     user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     expires_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
