@@ -1192,6 +1192,32 @@ class Handler(BaseHTTPRequestHandler):
                 body=json.dumps({"success":True,"email":user[2]},ensure_ascii=False).encode("utf-8")
                 self.send_header("Content-Length",str(len(body))); self.end_headers(); self.wfile.write(body); return
 
+            if self.path == "/api/auth/delete-account":
+                user=session_required(self)
+                if not user: return
+                if user[3] != "owner":
+                    self.send_json(403,{"error":"Sadece işletme sahibi hesabını silebilir."}); return
+                password=str(data.get("password",""))
+                confirm=str(data.get("confirmation","")).strip().upper()
+                if len(password) < 8 or len(password) > 128:
+                    self.send_json(400,{"error":"Mevcut şifrenizi girin."}); return
+                if confirm != "SİL":
+                    self.send_json(400,{"error":"Silme işlemini onaylamak için SİL yazmalısınız."}); return
+                if not verify_password(password,user[3] if False else database.get_user_by_email(user[2])[3]):
+                    self.send_json(401,{"error":"Mevcut şifre hatalı."}); return
+                if database_enabled():
+                    sub=database.get_business_subscription(user[1])
+                    if str(sub.get("plan","trial")).lower()=="pro" and str(sub.get("status","")).lower()=="active":
+                        self.send_json(409,{"error":"Aktif Pro aboneliğiniz var. Hesabı silmeden önce aboneliği iptal edin."}); return
+                    deleted=database.delete_account(user[0],user[1])
+                    if not deleted:
+                        self.send_json(404,{"error":"Hesap bulunamadı."}); return
+                self.send_response(200)
+                self.send_header("Set-Cookie","session=; HttpOnly; SameSite=Lax; Path=/; Secure; Max-Age=0")
+                self.send_header("Content-Type","application/json; charset=utf-8")
+                body=json.dumps({"success":True,"message":"NEXORA hesabınız ve işletme verileriniz kalıcı olarak silindi."},ensure_ascii=False).encode("utf-8")
+                self.send_header("Content-Length",str(len(body))); self.end_headers(); self.wfile.write(body); return
+
             if self.path == "/api/auth/logout":
                 token=cookie_token(self)
                 if token and database_enabled():
