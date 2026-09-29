@@ -147,6 +147,9 @@ CREATE TABLE IF NOT EXISTS appointment_reminders (
     PRIMARY KEY (appointment_id, channel)
 );
 
+CREATE TABLE IF NOT EXISTS google_calendar_connections (business_id BIGINT PRIMARY KEY REFERENCES businesses(id) ON DELETE CASCADE,user_id BIGINT REFERENCES users(id) ON DELETE SET NULL,calendar_id TEXT NOT NULL DEFAULT 'primary',calendar_name TEXT NOT NULL DEFAULT '',access_token TEXT NOT NULL DEFAULT '',refresh_token TEXT NOT NULL DEFAULT '',access_token_expires_at TIMESTAMPTZ,scopes TEXT NOT NULL DEFAULT '',created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
+CREATE TABLE IF NOT EXISTS google_oauth_states (state TEXT PRIMARY KEY,business_id BIGINT NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,expires_at TIMESTAMPTZ NOT NULL,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
+CREATE TABLE IF NOT EXISTS google_calendar_events (business_id BIGINT NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,appointment_id TEXT NOT NULL REFERENCES appointments(id) ON DELETE CASCADE,event_id TEXT NOT NULL,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),PRIMARY KEY (business_id,appointment_id),UNIQUE (business_id,event_id));
 CREATE TABLE IF NOT EXISTS usage_counters (
     business_id BIGINT NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
     period_start DATE NOT NULL,
@@ -599,6 +602,47 @@ def update_user_permissions(business_id,user_id,permissions):
         row=conn.execute("UPDATE users SET permissions=%s WHERE id=%s AND business_id=%s RETURNING id",(psycopg.types.json.Json(permissions),user_id,business_id)).fetchone()
         conn.commit()
         return bool(row)
+def create_google_oauth_state(state,business_id,user_id,expires_at):
+    with connection() as conn:
+        conn.execute("DELETE FROM google_oauth_states WHERE expires_at<NOW()")
+        conn.execute("INSERT INTO google_oauth_states (state,business_id,user_id,expires_at) VALUES (%s,%s,%s,%s)",(state,business_id,user_id,expires_at)); conn.commit()
+
+def consume_google_oauth_state(state):
+    with connection() as conn:
+        row=conn.execute("DELETE FROM google_oauth_states WHERE state=%s AND expires_at>NOW() RETURNING business_id,user_id",(state,)).fetchone(); conn.commit()
+    return {"business_id":row[0],"user_id":row[1]} if row else None
+
+def save_google_calendar_connection(business_id,user_id,calendar_id,calendar_name,access_token,refresh_token,expires_at,scopes):
+    with connection() as conn:
+        conn.execute("""INSERT INTO google_calendar_connections (business_id,user_id,calendar_id,calendar_name,access_token,refresh_token,access_token_expires_at,scopes) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
+        ON CONFLICT (business_id) DO UPDATE SET user_id=EXCLUDED.user_id,calendar_id=EXCLUDED.calendar_id,calendar_name=EXCLUDED.calendar_name,access_token=EXCLUDED.access_token,refresh_token=EXCLUDED.refresh_token,access_token_expires_at=EXCLUDED.access_token_expires_at,scopes=EXCLUDED.scopes,updated_at=NOW()""",(business_id,user_id,calendar_id,calendar_name,encrypt_secret(access_token),encrypt_secret(refresh_token),expires_at,scopes)); conn.commit()
+
+def get_google_calendar_connection(business_id):
+    with connection() as conn:
+        r=conn.execute("SELECT calendar_id,calendar_name,access_token,refresh_token,access_token_expires_at,scopes FROM google_calendar_connections WHERE business_id=%s",(business_id,)).fetchone()
+    if not r:return None
+    return {"calendar_id":r[0],"calendar_name":r[1],"access_token":decrypt_secret(r[2]),"refresh_token":decrypt_secret(r[3]),"access_token_expires_at":r[4].isoformat() if r[4] else None,"scopes":r[5]}
+
+def update_google_calendar_tokens(business_id,access_token,expires_at):
+    with connection() as conn:
+        conn.execute("UPDATE google_calendar_connections SET access_token=%s,access_token_expires_at=%s,updated_at=NOW() WHERE business_id=%s",(encrypt_secret(access_token),expires_at,business_id)); conn.commit()
+
+def delete_google_calendar_connection(business_id):
+    with connection() as conn:
+        conn.execute("DELETE FROM google_calendar_connections WHERE business_id=%s",(business_id,)); conn.commit()
+
+def save_google_event(appointment_id,business_id,event_id):
+    with connection() as conn:
+        conn.execute("INSERT INTO google_calendar_events (business_id,appointment_id,event_id) VALUES (%s,%s,%s) ON CONFLICT (business_id,appointment_id) DO UPDATE SET event_id=EXCLUDED.event_id,updated_at=NOW()",(business_id,appointment_id,event_id)); conn.commit()
+
+def get_google_event_id(appointment_id,business_id):
+    with connection() as conn:
+        r=conn.execute("SELECT event_id FROM google_calendar_events WHERE appointment_id=%s AND business_id=%s",(appointment_id,business_id)).fetchone()
+    return r[0] if r else None
+
+def delete_google_event(appointment_id,business_id):
+    with connection() as conn:
+        conn.execute("DELETE FROM google_calendar_events WHERE appointment_id=%s AND business_id=%s",(appointment_id,business_id,)); conn.commit()
 
 def get_usage(business_id, metric, period_start=None):
     period_start = period_start or datetime.now(timezone.utc).date().replace(day=1)
