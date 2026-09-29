@@ -205,8 +205,25 @@ async function loadMasterPanel(){
 }
 document.getElementById("masterRefreshBtn")?.addEventListener("click",loadMasterPanel);
 
+async function getAuthStatus(retries=5){
+  let last={authenticated:false};
+  for(let attempt=0;attempt<retries;attempt++){
+    try{
+      const r=await fetch("/api/auth/status",{credentials:"same-origin",cache:"no-store"});
+      if(r.ok){
+        const data=await r.json();
+        return data;
+      }
+      last={authenticated:false,temporaryError:true};
+    }catch(e){
+      last={authenticated:false,temporaryError:true};
+    }
+    if(attempt<retries-1) await new Promise(resolve=>setTimeout(resolve,1500));
+  }
+  return last;
+}
 async function authInit(){
-  const status=await fetch("/api/auth/status",{credentials:"same-origin"}).then(r=>r.json()).catch(()=>({authenticated:false}));
+  const status=await getAuthStatus();
   const screen=document.getElementById("authScreen"), app=document.getElementById("app");
   if(status.authenticated){screen.style.display="none";app.style.display="block";loadSubscription();loadUsage();loadAudit();loadDashboard();loadMasterPanel();return;}
   const setup=await fetch("/api/auth/setup-available",{credentials:"same-origin"}).then(r=>r.json()).catch(()=>({available:false}));
