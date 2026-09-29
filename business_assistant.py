@@ -115,7 +115,13 @@ def send_email(to_address, subject, body):
         return False
 
 def frontend_base_url():
-    return os.environ.get("PUBLIC_APP_URL","").strip().rstrip("/") or ("https://" + os.environ.get("HOST","").strip() if os.environ.get("HOST") else "")
+    configured=os.environ.get("PUBLIC_APP_URL","").strip().rstrip("/")
+    if configured:
+        return configured
+    host=os.environ.get("HOST","").strip()
+    if host:
+        return "https://"+host
+    return "https://ai-isletme-asistani-1s10.onrender.com"
 
 def make_one_time_token():
     token=os.urandom(32).hex()
@@ -1106,10 +1112,7 @@ class Handler(BaseHTTPRequestHandler):
                     database.create_password_reset_token(token_hash,user[0],datetime.now(timezone.utc)+timedelta(minutes=30))
                     base=frontend_base_url()
                     if base:
-                        try:
-                            send_email(user[2],"NEXORA şifre sıfırlama",f"NEXORA şifrenizi yenilemek için bağlantı:\n{base}/?reset_token={token}\n\nBağlantı 30 dakika geçerlidir.")
-                        except Exception:
-                            pass
+                        send_email(user[2],"NEXORA şifre sıfırlama",f"NEXORA şifrenizi yenilemek için bağlantı:\n{base}/?reset_token={token}\n\nBağlantı 30 dakika geçerlidir.")
                 self.send_json(200,{"success":True,"message":"Eğer hesap varsa sıfırlama bağlantısı e-posta adresinize gönderildi."}); return
 
             if self.path == "/api/auth/reset-password":
