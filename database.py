@@ -594,6 +594,11 @@ def get_user_in_business(business_id, user_id):
             (user_id, business_id)
         ).fetchone()
 
+def get_user_permissions(business_id, user_id):
+    with connection() as conn:
+        row=conn.execute("SELECT permissions FROM users WHERE id=%s AND business_id=%s",(user_id,business_id)).fetchone()
+        return row[0] if row and row[0] else {}
+
 def count_owners(business_id):
     with connection() as conn:
         return conn.execute(
