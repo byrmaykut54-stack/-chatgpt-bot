@@ -95,18 +95,24 @@ def send_email(to_address, subject, body):
     password=os.environ.get("SMTP_PASSWORD","")
     sender=os.environ.get("SMTP_FROM",username).strip()
     if not host or not sender:
+        print("EMAIL_ERROR: SMTP_HOST veya SMTP_FROM eksik", flush=True)
         return False
     msg=EmailMessage()
     msg["From"]=sender
     msg["To"]=to_address
     msg["Subject"]=subject
     msg.set_content(body)
-    with smtplib.SMTP(host,port,timeout=20) as smtp:
-        smtp.starttls()
-        if username:
-            smtp.login(username,password)
-        smtp.send_message(msg)
-    return True
+    try:
+        with smtplib.SMTP(host,port,timeout=20) as smtp:
+            smtp.starttls()
+            if username:
+                smtp.login(username,password)
+            smtp.send_message(msg)
+        print("EMAIL_OK: password reset email sent", flush=True)
+        return True
+    except Exception as exc:
+        print(f"EMAIL_ERROR: {type(exc).__name__}: {exc}", flush=True)
+        return False
 
 def frontend_base_url():
     return os.environ.get("PUBLIC_APP_URL","").strip().rstrip("/") or ("https://" + os.environ.get("HOST","").strip() if os.environ.get("HOST") else "")
