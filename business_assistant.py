@@ -688,11 +688,20 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_HEAD(self):
         parsed = urlparse(self.path)
-        if parsed.path in ("/", "/index.html"):
+        static_types = {
+            "/": ("index.html", "text/html; charset=utf-8"),
+            "/index.html": ("index.html", "text/html; charset=utf-8"),
+            "/service-worker.js": ("service-worker.js", "application/javascript; charset=utf-8"),
+            "/manifest.webmanifest": ("manifest.webmanifest", "application/manifest+json; charset=utf-8"),
+            "/app-icon.svg": ("app-icon.svg", "image/svg+xml"),
+        }
+        if parsed.path in static_types:
+            filename, content_type = static_types[parsed.path]
             try:
-                size = os.path.getsize(HTML_PATH)
+                size = os.path.getsize(filename)
                 self.send_response(200)
-                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Type", content_type)
+                self.send_header("Cache-Control", "no-cache" if filename in {"index.html", "service-worker.js", "manifest.webmanifest"} else "public, max-age=86400")
                 self.send_header("Content-Length", str(size))
                 self.end_headers()
             except FileNotFoundError:
@@ -732,17 +741,26 @@ class Handler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(body.encode("utf-8"))
             return
-        if parsed.path in ("/", "/index.html"):
+        static_files = {
+            "/": ("index.html", "text/html; charset=utf-8"),
+            "/index.html": ("index.html", "text/html; charset=utf-8"),
+            "/service-worker.js": ("service-worker.js", "application/javascript; charset=utf-8"),
+            "/manifest.webmanifest": ("manifest.webmanifest", "application/manifest+json; charset=utf-8"),
+            "/app-icon.svg": ("app-icon.svg", "image/svg+xml"),
+        }
+        if parsed.path in static_files:
+            filename, content_type = static_files[parsed.path]
             try:
-                with open(HTML_PATH, "rb") as f:
+                with open(filename, "rb") as f:
                     body = f.read()
                 self.send_response(200)
-                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Type", content_type)
+                self.send_header("Cache-Control", "no-cache" if filename in {"index.html", "service-worker.js", "manifest.webmanifest"} else "public, max-age=86400")
                 self.send_header("Content-Length", str(len(body)))
                 self.end_headers()
                 self.wfile.write(body)
             except FileNotFoundError:
-                self.send_json(404, {"error": "index.html bulunamadı"})
+                self.send_json(404, {"error": filename + " bulunamadı"})
             return
         if parsed.path == "/billing/iyzico/callback":
             token=(parse_qs(parsed.query).get("token") or parse_qs(parsed.query).get("checkoutFormToken") or [""])[0]
@@ -803,6 +821,10 @@ class Handler(BaseHTTPRequestHandler):
             user=auth_required(self)
             if not user: return
             self.send_json(200,subscription_payload(user[1])); return
+        if parsed.path == "/api/usage":
+            user=auth_required(self)
+            if not user: return
+            self.send_json(200,usage_payload(user[1])); return
         if parsed.path == "/api/business":
             user=auth_required(self)
             if not user: return
