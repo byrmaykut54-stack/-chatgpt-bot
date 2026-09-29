@@ -102,7 +102,7 @@ const today=localDateISO();
 document.getElementById("todayLabel").textContent=new Date().toLocaleDateString("tr-TR",{weekday:"long",year:"numeric",month:"long",day:"numeric"});
 function escapeHtml(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[c]));}
 function badge(status){const l={pending:"Bekliyor",confirmed:"Onaylandı",cancelled:"İptal",completed:"Tamamlandı"}[status]||status;return '<span class="badge '+escapeHtml(status)+'">'+escapeHtml(l)+"</span>";}
-async function setStatus(id,status){const r=await fetch("/api/appointments/status",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id,status})});if(!r.ok){alert("Durum güncellenemedi.");return}loadDashboard();}
+async function setStatus(id,status){const r=await fetch("/api/appointments/status",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id,status})});if(!r.ok){const x=await r.json().catch(()=>({}));alert(x.error||"Durum güncellenemedi.");return}if(status==="confirmed"&&"Notification" in window&&Notification.permission==="granted"){try{new Notification("Randevu onaylandı",{body:"Randevu durumu onaylandı."});}catch(e){}}loadDashboard();}
 function actionButtons(x){return x.status==="pending"?'<button class="approve" onclick="setStatus(\''+escapeHtml(x.id)+'\',\'confirmed\')">✓ Onayla</button><button class="cancel" onclick="setStatus(\''+escapeHtml(x.id)+'\',\'cancelled\')">✕ İptal</button>':"";}
 function appointmentTable(items){if(!items.length)return '<div class="muted">Randevu bulunmuyor.</div>';return '<div class="scroll"><table><tr><th>Müşteri</th><th>Saat</th><th>Hizmet</th><th>Durum</th><th>İşlem</th></tr>'+items.map(x=>'<tr><td>'+escapeHtml(x.customer_name)+'</td><td>'+escapeHtml(x.time)+'</td><td>'+escapeHtml(x.service)+'</td><td>'+badge(x.status)+'</td><td>'+actionButtons(x)+'</td></tr>').join("")+"</table></div>";}
 async function loadUsage(){
@@ -148,7 +148,21 @@ function checkAppointmentNotifications(items){
     localStorage.setItem("nexora-notification-count",String(todayItems.length));
   }catch(e){}
 }
-function checkUpcomingReminders(items){}
+function checkUpcomingReminders(items){
+  try{
+    const active=(Array.isArray(items)?items:[]).filter(x=>x.status!=="cancelled");
+    const key="nexora-seen-appointment-ids";
+    const stored=JSON.parse(localStorage.getItem(key)||"[]");
+    const known=new Set(Array.isArray(stored)?stored:[]);
+    if(known.size===0){active.forEach(x=>known.add(String(x.id)));localStorage.setItem(key,JSON.stringify(Array.from(known).slice(-500)));return;}
+    const fresh=active.filter(x=>!known.has(String(x.id)));
+    if(fresh.length && "Notification" in window && Notification.permission==="granted"){
+      fresh.forEach(x=>appointmentNotification(x,"Yeni randevu"));
+    }
+    active.forEach(x=>known.add(String(x.id)));
+    localStorage.setItem(key,JSON.stringify(Array.from(known).slice(-500)));
+  }catch(e){}
+}
 
 async function loadDashboard(){
  const [ar,mr,cr,rr]=await Promise.all([fetch("/api/appointments"),fetch("/api/messages"),fetch("/api/customers"),fetch("/api/reports")]);
