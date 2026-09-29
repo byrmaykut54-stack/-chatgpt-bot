@@ -218,6 +218,19 @@ def auth_required(handler):
             return None
     return user
 
+def session_required(handler):
+    """Authenticate without blocking an expired trial so billing remains reachable."""
+    user = current_user(handler)
+    if not user:
+        handler.send_json(401, {"error":"Giriş yapmanız gerekiyor."})
+        return None
+    if database_enabled():
+        subscription = database.get_business_subscription(user[1])
+        if subscription["status"] != "active":
+            handler.send_json(403, {"error":"İşletme hesabı aktif değil."})
+            return None
+    return user
+
 
 def subscription_payload(business_id):
     if not database_enabled():
@@ -818,11 +831,11 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json(200,{"url":google_calendar.authorization_url(user[1],user[0])}); return
 
         if parsed.path == "/api/subscription":
-            user=auth_required(self)
+            user=session_required(self)
             if not user: return
             self.send_json(200,subscription_payload(user[1])); return
         if parsed.path == "/api/usage":
-            user=auth_required(self)
+            user=session_required(self)
             if not user: return
             self.send_json(200,usage_payload(user[1])); return
         if parsed.path == "/api/business":
@@ -971,7 +984,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(200,{"success":True,"results":results}); return
 
             if self.path == "/api/billing/complete":
-                user=auth_required(self)
+                user=session_required(self)
                 if not user: return
                 token=str(data.get("token","")).strip()
                 session=database.get_billing_checkout_session(token)
@@ -1015,7 +1028,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(200,{"success":True}); return
 
             if self.path == "/api/billing/start":
-                user=auth_required(self)
+                user=session_required(self)
                 if not user: return
                 if user[3] != "owner":
                     self.send_json(403,{"error":"Sadece işletme sahibi abonelik başlatabilir."}); return
@@ -1037,7 +1050,7 @@ class Handler(BaseHTTPRequestHandler):
                 return
 
             if self.path == "/api/billing/cancel":
-                user=auth_required(self)
+                user=session_required(self)
                 if not user: return
                 if user[3] != "owner":
                     self.send_json(403,{"error":"Sadece işletme sahibi aboneliği yönetebilir."}); return
