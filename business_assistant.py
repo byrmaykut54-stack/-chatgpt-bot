@@ -879,7 +879,18 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json(200,[{"id":x[0],"user_id":x[1],"action":x[2],"target_type":x[3],"target_id":x[4],"details":x[5],"created_at":x[6].isoformat()} for x in rows])
             return
         if parsed.path == "/health":
-            self.send_json(200, {"status": "ok", "service": "AI İşletme Asistanı"}); return
+            db_ok = False
+            if database_enabled():
+                try:
+                    database.ensure_schema()
+                    db_ok = True
+                except Exception:
+                    db_ok = False
+            self.send_json(200, {
+                "status": "ok" if db_ok else "degraded",
+                "service": "NEXORA",
+                "database": "ok" if db_ok else "unavailable"
+            }); return
         self.send_json(404, {"error": "Not found"})
 
     def csrf_request_allowed(self):
