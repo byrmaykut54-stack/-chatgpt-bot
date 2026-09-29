@@ -711,3 +711,80 @@ def get_subscription_record(business_id):
         "current_period_end": row[7].isoformat() if row[7] else None,
         "cancel_at_period_end": bool(row[8])
     }
+
+def create_billing_checkout_session(business_id, provider, checkout_token, conversation_id=""):
+    with connection() as conn:
+        row=conn.execute(
+            "INSERT INTO billing_checkout_sessions (business_id,provider,checkout_token,conversation_id) VALUES (%s,%s,%s,%s) RETURNING id",
+            (business_id,str(provider or ""),str(checkout_token or ""),str(conversation_id or ""))
+        ).fetchone()
+        conn.commit()
+        return row[0]
+
+def get_billing_checkout_session(checkout_token):
+    with connection() as conn:
+        return conn.execute(
+            "SELECT id,business_id,provider,checkout_token,conversation_id,created_at,completed_at FROM billing_checkout_sessions WHERE checkout_token=%s LIMIT 1",
+            (str(checkout_token or ""),)
+        ).fetchone()
+
+def complete_billing_checkout(checkout_token):
+    with connection() as conn:
+        conn.execute("UPDATE billing_checkout_sessions SET completed_at=NOW() WHERE checkout_token=%s AND completed_at IS NULL",(str(checkout_token or ""),))
+        conn.commit()
+
+def _parse_subscription_time(value):
+    if not value:
+        return None
+    if isinstance(value, datetime):
+        return value
+    try:
+        return datetime.fromisoformat(str(value).replace("Z","+00:00"))
+    except (TypeError, ValueError):
+        return None
+
+def create_or_update_subscription(business_id, provider, provider_customer_id, provider_subscription_id, status="pending", period_start=None, period_end=None, cancel_at_period_end=False):
+    status=str(status or "inactive").strip().lower()
+    plan="pro"
+    start=_parse_subscription_time(period_start)
+    end=_parse_subscription_time(period_end)
+    with connection() as conn:
+        row=conn.execute("""
+            INSERT INTO subscriptions
+              (business_id,provider,provider_customer_id,provider_subscription_id,plan,status,current_period_start,current_period_end,cancel_at_period_end)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            ON CONFLICT (business_id) DO UPDATE SET
+              provider=EXCLUDED.provider,
+              provider_customer_id=EXCLUDED.provider_customer_id,
+              provider_subscription_id=EXCLUDED.provider_subscription_id,
+              plan=EXCLUDED.plan,
+              status=EXCLUDED.status,
+              current_period_start=COALESCE(EXCLUDED.current_period_start,subscriptions.current_period_start),
+              current_period_end=COALESCE(EXCLUDED.current_period_end,subscriptions.current_period_end),
+              cancel_at_period_end=EXCLUDED.cancel_at_period_end,
+              updated_at=NOW()
+            RETURNING id
+        """,(business_id,str(provider or ""),str(provider_customer_id or ""),str(provider_subscription_id or ""),plan,status,start,end,bool(cancel_at_period_end))).fetchone()
+        business_status="active" if status in {"active","trialing"} else "inactive"
+        business_plan="pro" if status in {"active","trialing","past_due","unpaid"} else "trial"
+        conn.execute("UPDATE businesses SET plan=%s,status=%s WHERE id=%s",(business_plan,business_status,business_id))
+        conn.commit()
+        return row[0]
+
+def update_subscription_status(business_id,status,cancel_at_period_end=None,period_end=None):
+    status=str(status or "inactive").strip().lower()
+    with connection() as conn:
+        if cancel_at_period_end is None and period_end is None:
+            conn.execute("UPDATE subscriptions SET status=%s,updated_at=NOW() WHERE business_id=%s",(status,business_id))
+        else:
+            end=_parse_subscription_time(period_end)
+            conn.execute("UPDATE subscriptions SET status=%s,cancel_at_period_end=COALESCE(%s,cancel_at_period_end),current_period_end=COALESCE(%s,current_period_end),updated_at=NOW() WHERE business_id=%s",(status,cancel_at_period_end,end,business_id))
+        business_status="active" if status in {"active","trialing"} else "inactive"
+        business_plan="pro" if status in {"active","trialing","past_due","unpaid"} else "trial"
+        conn.execute("UPDATE businesses SET plan=%s,status=%s WHERE id=%s",(business_plan,business_status,business_id))
+        conn.commit()
+
+def get_business_by_provider_subscription(provider_subscription_id):
+    with connection() as conn:
+        row=conn.execute("SELECT business_id FROM subscriptions WHERE provider_subscription_id=%s LIMIT 1",(str(provider_subscription_id or ""),)).fetchone()
+    return row[0] if row else None
