@@ -43,7 +43,7 @@ input{width:100%;padding:12px 13px;border:1px solid #e0e5ea;background:#fbfcfd;b
 <input id="authEmail" type="email" placeholder="ornek@isletme.com" autocomplete="email" required>
 <label class="auth-label" for="authPassword">Şifre</label>
 <input id="authPassword" type="password" placeholder="••••••••" autocomplete="current-password" required>
-<div class="auth-row"><span></span><button id="forgotBtn" class="auth-link" type="button">Şifremi Unuttum</button></div>
+<div class="auth-row"><span></span><button id="forgotBtn" class="auth-link" type="button" onclick="const p=document.getElementById('forgotPanel');p.style.display=p.style.display==='none'?'block':'none';if(p.style.display==='block'){const e=document.getElementById('forgotEmail');e.value=document.getElementById('authEmail').value||'';setTimeout(()=>e.focus(),50)}">Şifremi Unuttum</button></div>
 <div id="forgotPanel" style="display:none;margin:10px 0 12px;padding:12px;border:1px solid #e7eaee;border-radius:12px;background:#fff">
   <div style="font-size:12px;font-weight:800;color:#344054;margin-bottom:6px">Şifre sıfırlama</div>
   <div style="font-size:11px;color:#667085;margin-bottom:8px">Hesabınızdaki e-posta adresini girin. Sıfırlama bağlantısı e-postanıza gönderilecek.</div>
