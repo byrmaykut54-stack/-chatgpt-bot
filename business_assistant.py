@@ -452,7 +452,7 @@ MESAJ:
 
 def create_appointment(data, user=None):
     appointment = {
-        "id": datetime.utcnow().strftime("%Y%m%d%H%M%S%f"),
+        "id": datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S%f"),
         "customer_name": str(data.get("customer_name", "")).strip(),
         "phone": str(data.get("phone", "")).strip(),
         "date": str(data.get("date", "")).strip(),
@@ -460,7 +460,7 @@ def create_appointment(data, user=None):
         "service": str(data.get("service", "")).strip(),
         "note": str(data.get("note", "")).strip(),
         "status": "pending",
-        "created_at": datetime.utcnow().isoformat() + "Z"
+        "created_at": datetime.now(timezone.utc).isoformat()
     }
     required = ["customer_name", "phone", "date", "time", "service"]
     if any(not appointment[x] for x in required):
@@ -477,14 +477,13 @@ def create_appointment(data, user=None):
         return None, "Seçilen gün işletme kapalı."
     if not re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", appointment["time"]):
         return None, "Geçerli bir saat seçin."
-    if not is_time_available(appointment["date"], appointment["time"], config, user):
-        return None, "Seçilen tarih ve saat uygun değil."
-
     items = load_appointments(user)
     active = {"pending", "confirmed"}
     conflict = next((item for item in items if item.get("date") == appointment["date"] and item.get("time") == appointment["time"] and item.get("status") in active), None)
     if conflict:
         return None, "Bu tarih ve saatte başka bir randevu bulunuyor."
+    if not is_time_available(appointment["date"], appointment["time"], config, user):
+        return None, "Seçilen tarih ve saat uygun değil."
 
     items.append(appointment)
     save_appointments(items, user)
@@ -591,14 +590,14 @@ def handle_customer_message(message, channel="web", customer_name="", phone="", 
     hint = local_intent_hint(message, config)
     intent = hint if hint else detect_appointment_intent(message, config)
     record = {
-        "id": datetime.utcnow().strftime("%Y%m%d%H%M%S%f"),
+        "id": datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S%f"),
         "channel": channel,
         "direction": "inbound",
         "customer_name": customer_name or intent.get("customer_name", ""),
         "phone": phone or intent.get("phone", ""),
         "message": message,
         "intent": intent.get("intent", "other"),
-        "created_at": datetime.utcnow().isoformat() + "Z"
+        "created_at": datetime.now(timezone.utc).isoformat()
     }
     messages = load_messages(user)
     messages.append(record)
@@ -1283,7 +1282,7 @@ class Handler(BaseHTTPRequestHandler):
                     out["reply_error"] = send_result
                 else:
                     messages = database.load_messages_by_business(business_id)
-                    messages.append({"id": datetime.utcnow().strftime("%Y%m%d%H%M%S%f"), "message_id": incoming.get("message_id", ""), "channel": "whatsapp", "direction": "outbound", "customer_name": incoming["customer_name"], "phone": incoming["phone"], "message": result["reply"], "intent": "ai_reply", "created_at": datetime.utcnow().isoformat() + "Z"})
+                    messages.append({"id": datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S%f"), "message_id": incoming.get("message_id", ""), "channel": "whatsapp", "direction": "outbound", "customer_name": incoming["customer_name"], "phone": incoming["phone"], "message": result["reply"], "intent": "ai_reply", "created_at": datetime.now(timezone.utc).isoformat()})
                     database.save_messages_by_business(business_id, messages)
                 self.send_json(200, out); return
 
