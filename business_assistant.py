@@ -44,6 +44,10 @@ RATE_LIMIT_MAX = 20
 REGISTER_RATE_LIMIT = 3
 REGISTER_RATE_WINDOW = 3600
 MAX_BODY_BYTES = 256 * 1024
+BUSINESS_TIMEZONE = timezone(timedelta(hours=3))  # Europe/Istanbul (Türkiye uses UTC+3)
+
+def business_now():
+    return datetime.now(BUSINESS_TIMEZONE)
 
 SYSTEM_PROMPT = """Sen bir küçük işletme müşteri iletişim asistanısın.
 İşletmenin verdiği bilgilere sadık kal. Bilgi yoksa uydurma.
@@ -467,7 +471,7 @@ def create_appointment(data, user=None):
         requested_date = datetime.strptime(appointment["date"], "%Y-%m-%d").date()
     except ValueError:
         return None, "Geçerli bir tarih seçin."
-    if requested_date < datetime.now().date():
+    if requested_date < business_now().date():
         return None, "Geçmiş bir tarihe randevu oluşturulamaz."
     if is_closed_day(appointment["date"], config):
         return None, "Seçilen gün işletme kapalı."
@@ -495,7 +499,7 @@ def appointment_time_from_text(text):
     return f"{hour:02d}:{minute:02d}"
 
 def resolve_relative_date(text):
-    today = datetime.now().date()
+    today = business_now().date()
     if "bugün" in text:
         return today.strftime("%Y-%m-%d")
     if "yarın" in text:
@@ -517,7 +521,7 @@ def local_intent_hint(message, config):
                 service = name
                 break
 
-        date_value = date_text or (datetime.now().strftime("%Y-%m-%d") if time_text and any(word in text for word in ("boş", "müsait", "uygun")) else "")
+        date_value = date_text or (business_now().strftime("%Y-%m-%d") if time_text and any(word in text for word in ("boş", "müsait", "uygun")) else "")
 
         return {
             "intent": "availability" if any(word in text for word in ("boş", "müsait", "uygun")) else "appointment",
@@ -578,8 +582,8 @@ def get_free_slots(date, config, user=None):
     start = int(match.group(1))
     end = int(match.group(3))
     first_hour = start
-    if date == datetime.now().strftime("%Y-%m-%d"):
-        first_hour = max(start, datetime.now().hour + (1 if datetime.now().minute else 0))
+    if date == business_now().strftime("%Y-%m-%d"):
+        first_hour = max(start, business_now().hour + (1 if business_now().minute else 0))
     return [f"{hour:02d}:00" for hour in range(first_hour, end) if is_time_available(date, f"{hour:02d}:00", config, user)]
 
 def handle_customer_message(message, channel="web", customer_name="", phone="", user=None):
@@ -607,7 +611,7 @@ def handle_customer_message(message, channel="web", customer_name="", phone="", 
         date = intent.get("date", "")
         time = intent.get("time", "")
         if not date:
-            date = datetime.now().strftime("%Y-%m-%d")
+            date = business_now().strftime("%Y-%m-%d")
         if is_closed_day(date, config):
             return {"reply": f"{date} günü işletme kapalıdır. Pazar günleri tatildir."}
         if not time:
