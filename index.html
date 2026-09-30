@@ -229,7 +229,7 @@ linear-gradient(135deg,#0a111f 0%,#172235 58%,#202d40 100%);color:#fff;box-shado
 </div><nav id="nexoraNav" class="nx-nav" aria-label="NEXORA menü">
 <button data-page="dashboard" class="active">⌂ Genel Bakış</button><button data-page="appointments">📅 Randevular</button><button data-page="customers">👥 Müşteriler</button><button data-page="messages">💬 Mesajlar & AI</button><button data-page="team">👤 Ekip</button><button data-page="settings">⚙️ Ayarlar</button><button data-page="subscription">◈ Abonelik</button><button data-page="usage">◔ Kullanım</button><button data-page="audit">🛡️ Denetim</button>
 </nav><div id="nxPageHead" class="nx-page-head"><h2>Genel Bakış</h2><span id="nxPageHint">İşletmenizin bugünkü özeti</span></div>
-<section class="nx-dashboard-hero">
+<section class="nx-page" data-nx-page="dashboard"><section class="nx-dashboard-hero">
   <div class="nx-hero-copy">
     <div class="nx-hero-kicker">NEXORA BUSINESS OS</div>
     <h3>İşletmenizin kontrolü,<br><span>tek ekranda.</span></h3>
@@ -251,7 +251,7 @@ linear-gradient(135deg,#0a111f 0%,#172235 58%,#202d40 100%);color:#fff;box-shado
     <div class="card"><div class="label">ONAYLANAN</div><div class="stat" id="confirmedCount">0</div></div>
     <div class="card"><div class="label">MÜŞTERİLER</div><div class="stat" id="customerCount">0</div></div>
     <div class="card"><div class="label">MESAJLAR</div><div class="stat" id="messageCount">0</div></div>
-    <div class="card"><div class="label">ABONELİK</div><div class="stat" id="subscriptionPlan">TRIAL</div><div id="subscriptionInfo" class="muted" style="font-size:11px;margin-top:5px"></div><button id="proBtn" class="primary full" style="margin-top:10px">Pro'ya Geç</button></div>
+    <div class="card"><div class="label">ABONELİK</div><div class="stat" id="dashboardPlan">TRIAL</div><div id="subscriptionInfo" class="muted" style="font-size:11px;margin-top:5px"></div><button id="proBtn" class="primary full" style="margin-top:10px">Pro'ya Geç</button></div>
     <div class="card"><div class="label">KULLANIM</div><div id="usageInfo" class="muted" style="font-size:12px;margin-top:8px">Yükleniyor...</div></div>
   </div>
   <div class="layout nx-single">
@@ -370,7 +370,7 @@ linear-gradient(135deg,#0a111f 0%,#172235 58%,#202d40 100%);color:#fff;box-shado
   </div>
 </section>
 
-<section class="nx-page" data-nx-page="subscription"><div class="nx-billing-shell"><div class="nx-billing-hero"><div><div class="nx-hero-kicker">NEXORA PLANS</div><h3>İşletmeniz büyüdükçe,<br><span>platformunuz da büyüsün.</span></h3><p>Randevu, AI ve işletme operasyonlarınız için planınızı yönetin.</p></div><div class="nx-billing-badge">GÜVENLİ ABONELİK</div></div><div class="nx-plan-grid"><div class="card nx-plan-card"><div class="nx-plan-top"><span>BAŞLANGIÇ</span><b>TRIAL</b></div><h4>Ücretsiz</h4><p>İşletmenizi NEXORA ile tanımak için temel çalışma alanı.</p><ul><li>50 randevu / ay</li><li>200 AI mesajı / ay</li><li>Temel CRM ve operasyon</li></ul></div><div class="card nx-plan-card nx-plan-pro"><div class="nx-plan-top"><span>PROFESYONEL</span><b>PRO</b></div><h4>NEXORA Pro</h4><p>Daha yüksek kullanım limitleri ve büyüyen işletmeler için.</p><ul><li>1000 randevu / ay</li><li>5000 AI mesajı / ay</li><li>Gelişmiş işletme yönetimi</li></ul></div></div><div class="card nx-billing-status"><div><span class="nx-billing-kicker">MEVCUT PLAN</span><strong id="subscriptionPlan">TRIAL</strong><div id="nxSubscriptionInfo" class="muted">Abonelik bilgisi yükleniyor...</div></div><button id="nxProBtn" class="primary">Pro'ya Geç</button></div></div></section>
+<section class="nx-page" data-nx-page="subscription"><div class="nx-billing-shell"><div class="nx-billing-hero"><div><div class="nx-hero-kicker">NEXORA PLANS</div><h3>İşletmeniz büyüdükçe,<br><span>platformunuz da büyüsün.</span></h3><p>Randevu, AI ve işletme operasyonlarınız için planınızı yönetin.</p></div><div class="nx-billing-badge">GÜVENLİ ABONELİK</div></div><div class="nx-plan-grid"><div class="card nx-plan-card"><div class="nx-plan-top"><span>BAŞLANGIÇ</span><b>TRIAL</b></div><h4>Ücretsiz</h4><p>İşletmenizi NEXORA ile tanımak için temel çalışma alanı.</p><ul><li>50 randevu / ay</li><li>200 AI mesajı / ay</li><li>Temel CRM ve operasyon</li></ul></div><div class="card nx-plan-card nx-plan-pro"><div class="nx-plan-top"><span>PROFESYONEL</span><b>PRO</b></div><h4>NEXORA Pro</h4><p>Daha yüksek kullanım limitleri ve büyüyen işletmeler için.</p><ul><li>1000 randevu / ay</li><li>5000 AI mesajı / ay</li><li>Gelişmiş işletme yönetimi</li></ul></div></div><div class="card nx-billing-status"><div><span class="nx-billing-kicker">MEVCUT PLAN</span><strong id="subscriptionCurrentPlan">TRIAL</strong><div id="nxSubscriptionInfo" class="muted">Abonelik bilgisi yükleniyor...</div></div><button id="nxProBtn" class="primary">Pro'ya Geç</button></div></div></section>
 <section class="nx-page" data-nx-page="usage"><div class="nx-usage-shell"><div class="nx-usage-hero"><div><div class="nx-hero-kicker">KULLANIM MERKEZİ</div><h3>Aylık kullanımınızı izleyin.</h3><p>Randevu ve AI mesaj limitlerinizi tek bakışta takip edin.</p></div><div class="nx-usage-badge">LIVE USAGE</div></div><div class="card nx-usage-card"><div class="nx-usage-head"><div><span>KOTA & TÜKETİM</span><h4>Bu ayki kullanım</h4></div><div class="nx-usage-dot">● AKTİF</div></div><div id="nxUsageInfo" class="nx-usage-info">Kullanım bilgisi yükleniyor...</div></div></div></section>
 <section class="nx-page" data-nx-page="audit"><div class="nx-audit-shell"><div class="nx-audit-hero"><div><div class="nx-hero-kicker">GÜVENLİK & DENETİM</div><h3>İşletmenizde ne olduğunu bilin.</h3><p>Önemli hesap ve işletme işlemlerinin güvenlik kayıtlarını inceleyin.</p></div><div class="nx-audit-badge">AUDIT LOG</div></div><div class="card nx-audit-card"><div class="nx-audit-head"><div><span>SON İŞLEMLER</span><h4>Denetim kayıtları</h4></div><div class="nx-audit-shield">🛡</div></div><div id="auditLogs" class="nx-audit-list muted">Kayıtlar yükleniyor...</div></div></div></section>
 </div><script>
@@ -398,7 +398,7 @@ async function loadSubscription(){
  const s=await r.json(); const plan=(s.plan||"trial").toUpperCase();
  const planText=plan==="PRO"?"PRO":"TRIAL";
  const infoText=plan==="PRO"?(s.subscription&&s.subscription.current_period_end?"Dönem sonu: "+new Date(s.subscription.current_period_end).toLocaleDateString("tr-TR"):"Aktif Pro abonelik"):(s.trial_ends_at?"Deneme sonu: "+new Date(s.trial_ends_at).toLocaleDateString("tr-TR"):"");
- const p=document.getElementById("subscriptionPlan"); if(p)p.textContent=planText;
+ const p=document.getElementById("dashboardPlan"); if(p)p.textContent=planText;
  const i=document.getElementById("subscriptionInfo"); if(i)i.textContent=infoText;
  const i2=document.getElementById("nxSubscriptionInfo"); if(i2)i2.textContent=infoText;
  const btn=document.getElementById("proBtn"); const btn2=document.getElementById("nxProBtn");
