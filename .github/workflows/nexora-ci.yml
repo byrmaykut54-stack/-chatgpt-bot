@@ -24,27 +24,28 @@ jobs:
       - name: Run unit tests
         run: python -m unittest discover -v
       - name: Validate JSON
-        run: python - <<'PY'
-import json
-from pathlib import Path
-for p in Path(".").glob("*.json"):
-    json.loads(p.read_text(encoding="utf-8"))
-    print("OK", p)
-PY
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          for p in Path(".").glob("*.json"):
+              json.loads(p.read_text(encoding="utf-8"))
+              print("OK", p)
+          PY
       - name: Validate frontend JavaScript and referenced IDs
         run: |
           python - <<'PY'
-import re
-from pathlib import Path
-html=Path("index.html").read_text(encoding="utf-8")
-scripts=re.findall(r"<script(?:\s[^>]*)?>(.*?)</script>",html,re.S|re.I)
-for i,script in enumerate(scripts):
-    Path(f"/tmp/nexora-{i}.js").write_text(script,encoding="utf-8")
-ids=set(re.findall(r'\bid=["\']([^"\']+)["\']',html))
-refs=set(re.findall(r'getElementById\(["\']([^"\']+)["\']\)',html))
-missing=sorted(x for x in refs if x not in ids)
-if missing:
-    raise SystemExit("Missing DOM IDs: "+", ".join(missing))
-print(f"Validated {len(scripts)} inline script block(s), {len(ids)} IDs")
-PY
+          import re
+          from pathlib import Path
+          html=Path("index.html").read_text(encoding="utf-8")
+          scripts=re.findall(r"<script(?:\s[^>]*)?>(.*?)</script>",html,re.S|re.I)
+          for i,script in enumerate(scripts):
+              Path(f"/tmp/nexora-{i}.js").write_text(script,encoding="utf-8")
+          ids=set(re.findall(r'\bid=["\']([^"\']+)["\']',html))
+          refs=set(re.findall(r'getElementById\(["\']([^"\']+)["\']\)',html))
+          missing=sorted(x for x in refs if x not in ids)
+          if missing:
+              raise SystemExit("Missing DOM IDs: "+", ".join(missing))
+          print(f"Validated {len(scripts)} inline script block(s), {len(ids)} IDs")
+          PY
           for f in /tmp/nexora-*.js; do node --check "$f"; done
