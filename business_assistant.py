@@ -823,15 +823,6 @@ class Handler(BaseHTTPRequestHandler):
             body='<!doctype html><html lang="tr"><head><meta charset="utf-8"><title>NEXORA Ödeme</title></head><body style="font-family:Arial;padding:40px;text-align:center"><h2>NEXORA</h2><p>Ödeme sonucu kontrol ediliyor...</p><script>fetch("/api/billing/complete",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({token:'+safe+'})}).then(()=>location.href="/").catch(()=>location.href="/");</script></body></html>'
             self.send_response(200); self.send_header("Content-Type","text/html; charset=utf-8"); self.send_header("Content-Length",str(len(body.encode("utf-8")))); self.end_headers(); self.wfile.write(body.encode("utf-8")); return
 
-        if parsed.path == "/api/debug/reset-all":
-            expected=os.environ.get("NEXORA_RESET_TOKEN","").strip()
-            provided=(parse_qs(parsed.query).get("token") or [""])[0]
-            if not expected or not provided or not hmac.compare_digest(expected,provided):
-                self.send_json(403,{"error":"Forbidden"}); return
-            if not database_enabled():
-                self.send_json(503,{"error":"Database unavailable"}); return
-            counts=database.reset_all_data()
-            self.send_json(200,{"ok":True,"cleared":counts}); return
         if parsed.path == "/api/master/status":
             user=master_admin_required(self)
             if not user: return
