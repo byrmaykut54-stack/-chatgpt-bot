@@ -139,6 +139,22 @@ linear-gradient(135deg,#0a111f 0%,#172235 58%,#202d40 100%);color:#fff;box-shado
  .nx-dashboard-hero + .grid .card:nth-child(6),.nx-dashboard-hero + .grid .card:nth-child(7){grid-column:1/-1}
  .nx-hero-actions button{flex:1}
 }
+
+/* NEXORA appointments — premium operations center */
+.nx-appt-shell{display:block}
+.nx-appt-topline{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;margin-bottom:16px;padding:25px 28px;border-radius:22px;background:linear-gradient(135deg,#fff,#f8fafc);border:1px solid rgba(15,23,42,.07);box-shadow:0 14px 38px rgba(15,23,42,.05)}
+.nx-appt-topline h3{font-size:27px;letter-spacing:-.04em;margin:0 0 6px}.nx-appt-topline p{margin:0;color:#7b8491;font-size:12px}.nx-appt-add{min-width:150px}
+.nx-appt-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+.nx-appt-stats>div{padding:15px 17px;border:1px solid rgba(15,23,42,.07);border-radius:17px;background:rgba(255,255,255,.78);box-shadow:0 8px 22px rgba(15,23,42,.035)}
+.nx-appt-stats span{display:block;font-size:9px;font-weight:850;letter-spacing:.14em;color:#9a7b35}.nx-appt-stats b{display:block;font-size:25px;letter-spacing:-.04em;margin-top:5px}.nx-appt-stats small{font-size:10px;color:#8a929d}
+.nx-appt-main{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(290px,.7fr);gap:16px;align-items:start}
+.nx-appointment-workspace{min-width:0}
+.nx-appt-toolbar{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px}.nx-appt-date-label{font-size:11px;font-weight:800;color:#667085}
+.nx-appt-create{position:sticky;top:78px}.nx-create-head{display:flex;justify-content:space-between;gap:10px;margin-bottom:16px}.nx-create-head span{font-size:9px;letter-spacing:.16em;font-weight:850;color:#9a7b35}.nx-create-head h3{font-size:20px;margin:4px 0}.nx-create-head p{font-size:11px;color:#8a929d;margin:0;line-height:1.45}.nx-create-icon{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;background:#f5edda;color:#765b22;font-size:20px;font-weight:700}
+.nx-appt-create label{display:block;font-size:9px;font-weight:850;letter-spacing:.09em;color:#667085;margin:10px 0}.nx-appt-create label input{margin:5px 0 0}.nx-create-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.nx-appt-views{display:flex;gap:5px}.nx-appt-views button{background:#f4f6f8;color:#667085}.nx-appt-views button.active{background:#0b1220;color:#fff}
+@media(max-width:900px){.nx-appt-main{grid-template-columns:1fr}.nx-appt-create{position:static}.nx-appt-stats{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:600px){.nx-appt-topline{display:block;padding:20px;border-radius:20px}.nx-appt-add{width:100%;margin-top:16px}.nx-appt-topline h3{font-size:24px}.nx-appt-toolbar{display:block}.nx-appt-views{margin-top:9px}.nx-appt-stats{gap:8px}.nx-appt-stats>div{padding:12px}.nx-appt-stats b{font-size:22px}}
 </style>
 
 <style id="nx-navigation-css">.nx-page{display:block}.nx-hidden{display:none!important}</style><style id="nx-calendar-css">.nx-calbar{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:12px}.nx-calbar .group{display:flex;gap:6px;align-items:center}.nx-calbar button{background:#f5f7f9;color:#344054}.nx-calbar button.active{background:#111827;color:#fff}.nx-filter{display:grid;grid-template-columns:1.2fr 1fr 1fr auto;gap:8px;margin-bottom:12px}.nx-filter input,.nx-filter select{margin:0}.nx-daygrid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}.nx-day{min-height:110px;border:1px solid #e8ebef;border-radius:12px;padding:8px;background:#fff}.nx-day.muted{background:#fafbfc}.nx-day.today{border-color:#b7a16a;box-shadow:inset 0 0 0 1px #b7a16a}.nx-dayhead{font-size:11px;font-weight:850;margin-bottom:7px;display:flex;justify-content:space-between}.nx-appt{font-size:10px;padding:6px 7px;border-radius:8px;background:#f0f8f3;margin:4px 0;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.nx-appt.pending{background:#fff7df}.nx-appt.cancelled{background:#fdebea;text-decoration:line-through}.nx-list-actions{display:flex;gap:5px;flex-wrap:wrap}.nx-list-actions button{font-size:10px;padding:6px 8px}.nx-detail{padding:14px;border:1px solid #e7eaee;border-radius:14px;background:#fafbfc;margin-top:10px}.nx-empty{padding:20px;text-align:center;color:#8a929d;border:1px dashed #dfe4e8;border-radius:12px}@media(max-width:700px){.nx-filter{grid-template-columns:1fr 1fr}.nx-daygrid{grid-template-columns:repeat(2,1fr)}.nx-day{min-height:90px}.nx-day:nth-child(n+7){display:none}.nx-calbar{align-items:stretch}.nx-calbar .group{width:100%}.nx-calbar .group button{flex:1}}</style>
@@ -216,15 +232,37 @@ linear-gradient(135deg,#0a111f 0%,#172235 58%,#202d40 100%);color:#fff;box-shado
 </section>
 
 <section class="nx-page" data-nx-page="appointments">
-  <div class="layout nx-single">
-    <main>
-      <div class="card nx-appointment-workspace"><h2>📅 Randevu Merkezi</h2>
-        <div class="nx-calbar"><div class="group"><button type="button" id="nxPrevDay">‹</button><button type="button" id="nxToday" class="active">Bugün</button><button type="button" id="nxNextDay">›</button></div><div class="group"><button type="button" id="nxListView" class="active">Liste</button><button type="button" id="nxCalendarView">Takvim</button></div></div>
-        <div class="nx-filter"><input id="nxApptSearch" placeholder="Müşteri veya telefon ara"><input id="nxApptDate" type="date"><select id="nxApptStatus"><option value="">Tüm durumlar</option><option value="pending">Bekleyen</option><option value="confirmed">Onaylanan</option><option value="cancelled">İptal</option></select><button type="button" class="primary" id="nxNewAppt">＋ Randevu</button></div>
+  <div class="nx-appt-shell">
+    <div class="nx-appt-topline">
+      <div><div class="nx-hero-kicker">OPERASYON MERKEZİ</div><h3>Randevularınızı yönetin.</h3><p>Bugünün yoğunluğunu görün, bekleyen talepleri onaylayın ve yeni randevuyu saniyeler içinde oluşturun.</p></div>
+      <button type="button" class="primary nx-appt-add" id="nxNewAppt">＋ Yeni Randevu</button>
+    </div>
+    <div class="nx-appt-stats">
+      <div><span>BUGÜN</span><b id="nxApptTodayStat">—</b><small>randevu</small></div>
+      <div><span>BEKLEYEN</span><b id="nxApptPendingStat">—</b><small>onay bekliyor</small></div>
+      <div><span>ONAYLANAN</span><b id="nxApptConfirmedStat">—</b><small>planlandı</small></div>
+      <div><span>GÖRÜNÜM</span><b id="nxApptViewStat">LİSTE</b><small>aktif görünüm</small></div>
+    </div>
+    <div class="nx-appt-main">
+      <div class="card nx-appointment-workspace">
+        <div class="nx-appt-toolbar">
+          <div class="nx-calbar"><div class="group"><button type="button" id="nxPrevDay">‹</button><button type="button" id="nxToday" class="active">Bugün</button><button type="button" id="nxNextDay">›</button></div><div class="nx-appt-date-label" id="nxApptDateLabel">Bugün</div></div>
+          <div class="group nx-appt-views"><button type="button" id="nxListView" class="active">☷ Liste</button><button type="button" id="nxCalendarView">▦ Takvim</button></div>
+        </div>
+        <div class="nx-filter"><input id="nxApptSearch" placeholder="⌕  Müşteri veya telefon ara"><input id="nxApptDate" type="date"><select id="nxApptStatus"><option value="">Tüm durumlar</option><option value="pending">Bekleyen</option><option value="confirmed">Onaylanan</option><option value="cancelled">İptal</option></select></div>
         <div id="nxAppointmentContent"><div id="todayAppointments" class="muted">Yükleniyor...</div></div>
       </div>
-      <div class="card" id="appointmentCreateCard"><h2>➕ Randevu Ekle</h2><form id="appointmentForm"><input id="customer_name" placeholder="Müşteri adı" required><input id="phone" placeholder="Telefon" required><input id="date" type="date" required><input id="time" type="time" required><input id="service" placeholder="Hizmet" required><button class="primary full">Randevuyu Kaydet</button></form></div>
-    </main>
+      <div class="card nx-appt-create" id="appointmentCreateCard">
+        <div class="nx-create-head"><div><span>HIZLI KAYIT</span><h3>Yeni randevu</h3><p>Müşteriniz için uygun zamanı hemen planlayın.</p></div><div class="nx-create-icon">＋</div></div>
+        <form id="appointmentForm">
+          <label>MÜŞTERİ ADI<input id="customer_name" placeholder="Örn. Ahmet Yılmaz" required></label>
+          <label>TELEFON<input id="phone" placeholder="05xx xxx xx xx" required></label>
+          <div class="nx-create-grid"><label>TARİH<input id="date" type="date" required></label><label>SAAT<input id="time" type="time" required></label></div>
+          <label>HİZMET<input id="service" placeholder="Örn. Saç + Sakal" required></label>
+          <button class="primary full">Randevuyu Kaydet</button>
+        </form>
+      </div>
+    </div>
   </div>
 </section>
 
