@@ -585,7 +585,7 @@ function nxSetPage(page,writeHash=true){
  const meta={dashboard:["Genel Bakış","İşletmenizin bugünkü özeti"],appointments:["Randevular","Randevularınızı görüntüleyin, yönetin ve yeni randevu oluşturun"],customers:["Müşteriler","Müşteri kayıtları ve iletişim bilgileri"],messages:["Mesajlar & AI","Müşteri mesajlarını ve NEXORA AI asistanını yönetin"],team:["Ekip","Çalışan hesapları ve yetkileri"],settings:["Ayarlar","İşletme, çalışma düzeni ve entegrasyon ayarları"],subscription:["Abonelik","Planınızı ve abonelik durumunuzu yönetin"],usage:["Kullanım","Aylık randevu ve AI kullanımınızı izleyin"],audit:["Denetim","İşletme işlemlerinin güvenlik kayıtları"]};
  const m=meta[page]||meta.dashboard;document.getElementById("nxPageHead").querySelector("h2").textContent=m[0];document.getElementById("nxPageHint").textContent=m[1];
  if(writeHash)history.replaceState(null,"","#"+page);
- window.scrollTo({top:0,behavior:"smooth"});
+ // Menü seçildiğinde sayfanın mevcut dikey konumu korunur.
 }
 document.querySelectorAll("#nexoraNav [data-page]").forEach(btn=>btn.addEventListener("click",()=>{nxSetPage(btn.dataset.page);nxCloseMenu();}));
 const nxMenuTrigger=document.getElementById("nxMenuTrigger"),nxMenuPanel=document.getElementById("nexoraNav");
