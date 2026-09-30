@@ -155,6 +155,14 @@ linear-gradient(135deg,#0a111f 0%,#172235 58%,#202d40 100%);color:#fff;box-shado
 .nx-appt-views{display:flex;gap:5px}.nx-appt-views button{background:#f4f6f8;color:#667085}.nx-appt-views button.active{background:#0b1220;color:#fff}
 @media(max-width:900px){.nx-appt-main{grid-template-columns:1fr}.nx-appt-create{position:static}.nx-appt-stats{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:600px){.nx-appt-topline{display:block;padding:20px;border-radius:20px}.nx-appt-add{width:100%;margin-top:16px}.nx-appt-topline h3{font-size:24px}.nx-appt-toolbar{display:block}.nx-appt-views{margin-top:9px}.nx-appt-stats{gap:8px}.nx-appt-stats>div{padding:12px}.nx-appt-stats b{font-size:22px}}
+
+/* NEXORA CRM — premium customer workspace */
+.nx-crm-head{display:flex;justify-content:space-between;align-items:center;gap:18px;padding:26px 28px;margin-bottom:14px;border-radius:22px;background:linear-gradient(135deg,#fff,#f8fafc);border:1px solid rgba(15,23,42,.07);box-shadow:0 14px 38px rgba(15,23,42,.05)}
+.nx-crm-head h3{font-size:27px;letter-spacing:-.04em;margin:0 0 6px}.nx-crm-head p{margin:0;color:#7b8491;font-size:12px}.nx-crm-badge{padding:8px 11px;border-radius:999px;background:#f5edda;color:#765b22;font-size:9px;font-weight:850;letter-spacing:.14em;white-space:nowrap}
+.nx-crm-toolbar{display:flex;gap:10px;margin-bottom:14px}.nx-crm-search{display:flex;align-items:center;gap:8px;flex:1;padding:0 13px;background:#fff;border:1px solid rgba(15,23,42,.08);border-radius:13px;box-shadow:0 7px 20px rgba(15,23,42,.035)}.nx-crm-search span{color:#9a7b35;font-size:19px}.nx-crm-search input{border:0;background:transparent;margin:0;box-shadow:none}.nx-crm-search input:focus{box-shadow:none}
+.nx-crm-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.nx-crm-list:empty{display:block}
+.nx-crm-list .nx-customer{background:rgba(255,255,255,.9);border:1px solid rgba(15,23,42,.075);border-radius:18px;padding:17px;transition:.18s}.nx-crm-list .nx-customer:hover{transform:translateY(-2px)}
+@media(max-width:700px){.nx-crm-head{display:block;padding:21px 20px;border-radius:20px}.nx-crm-head h3{font-size:24px}.nx-crm-badge{display:inline-block;margin-top:14px}.nx-crm-toolbar{align-items:stretch}.nx-crm-toolbar .primary{min-width:82px}.nx-crm-list{grid-template-columns:1fr}}
 </style>
 
 <style id="nx-navigation-css">.nx-page{display:block}.nx-hidden{display:none!important}</style><style id="nx-calendar-css">.nx-calbar{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:12px}.nx-calbar .group{display:flex;gap:6px;align-items:center}.nx-calbar button{background:#f5f7f9;color:#344054}.nx-calbar button.active{background:#111827;color:#fff}.nx-filter{display:grid;grid-template-columns:1.2fr 1fr 1fr auto;gap:8px;margin-bottom:12px}.nx-filter input,.nx-filter select{margin:0}.nx-daygrid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}.nx-day{min-height:110px;border:1px solid #e8ebef;border-radius:12px;padding:8px;background:#fff}.nx-day.muted{background:#fafbfc}.nx-day.today{border-color:#b7a16a;box-shadow:inset 0 0 0 1px #b7a16a}.nx-dayhead{font-size:11px;font-weight:850;margin-bottom:7px;display:flex;justify-content:space-between}.nx-appt{font-size:10px;padding:6px 7px;border-radius:8px;background:#f0f8f3;margin:4px 0;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.nx-appt.pending{background:#fff7df}.nx-appt.cancelled{background:#fdebea;text-decoration:line-through}.nx-list-actions{display:flex;gap:5px;flex-wrap:wrap}.nx-list-actions button{font-size:10px;padding:6px 8px}.nx-detail{padding:14px;border:1px solid #e7eaee;border-radius:14px;background:#fafbfc;margin-top:10px}.nx-empty{padding:20px;text-align:center;color:#8a929d;border:1px dashed #dfe4e8;border-radius:12px}@media(max-width:700px){.nx-filter{grid-template-columns:1fr 1fr}.nx-daygrid{grid-template-columns:repeat(2,1fr)}.nx-day{min-height:90px}.nx-day:nth-child(n+7){display:none}.nx-calbar{align-items:stretch}.nx-calbar .group{width:100%}.nx-calbar .group button{flex:1}}</style>
@@ -267,7 +275,17 @@ linear-gradient(135deg,#0a111f 0%,#172235 58%,#202d40 100%);color:#fff;box-shado
 </section>
 
 <section class="nx-page" data-nx-page="customers">
-  <div class="card"><h2>👥 Müşteri Merkezi</h2><div id="customers" class="muted">Yükleniyor...</div></div>
+  <div class="nx-crm-shell">
+    <div class="nx-crm-head">
+      <div><div class="nx-hero-kicker">CRM & MÜŞTERİLER</div><h3>Müşterilerinizi tanıyın.</h3><p>İletişim bilgileri, randevu geçmişi ve müşteri detayları tek çalışma alanında.</p></div>
+      <div class="nx-crm-badge">NEXORA CRM</div>
+    </div>
+    <div class="nx-crm-toolbar">
+      <div class="nx-crm-search"><span>⌕</span><input id="nxCustomerSearch" placeholder="Müşteri adı veya telefon ara"></div>
+      <button type="button" class="primary" id="nxCustomerRefresh">↻ Yenile</button>
+    </div>
+    <div id="customers" class="nx-crm-list muted">Müşteriler yükleniyor...</div>
+  </div>
 </section>
 
 <section class="nx-page" data-nx-page="messages">
