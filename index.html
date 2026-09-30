@@ -143,7 +143,7 @@ input{width:100%;padding:12px 13px;border:1px solid #e0e5ea;background:#fbfcfd;b
 </section>
 
 <section class="nx-page" data-nx-page="subscription">
-  <div class="card"><h2>◈ Abonelik</h2><div class="plans"><div class="plan"><div class="plan-name">TRIAL</div><div class="plan-price">Ücretsiz</div><ul><li>50 randevu / ay</li><li>200 AI mesajı / ay</li></ul></div><div class="plan pro"><div class="plan-name">PRO</div><div class="plan-price">NEXORA Pro</div><ul><li>1000 randevu / ay</li><li>5000 AI mesajı / ay</li></ul></div></div><div id="subscriptionInfo" class="muted">Abonelik bilgisi yükleniyor...</div><div style="margin-top:12px"><button id="proBtn" class="primary">Pro'ya Geç</button></div></div>
+  <div class="card"><h2>◈ Abonelik</h2><div class="plans"><div class="plan"><div class="plan-name">TRIAL</div><div class="plan-price">Ücretsiz</div><ul><li>50 randevu / ay</li><li>200 AI mesajı / ay</li></ul></div><div class="plan pro"><div class="plan-name">PRO</div><div class="plan-price">NEXORA Pro</div><ul><li>1000 randevu / ay</li><li>5000 AI mesajı / ay</li></ul></div></div><div id="nxSubscriptionInfo" class="muted">Abonelik bilgisi yükleniyor...</div><div style="margin-top:12px"><button id="nxProBtn" class="primary">Pro'ya Geç</button></div></div>
 </section>
 
 <section class="nx-page" data-nx-page="usage">
@@ -177,13 +177,15 @@ async function loadAudit(){
 async function loadSubscription(){
  const r=await fetch("/api/subscription"); if(!r.ok)return;
  const s=await r.json(); const plan=(s.plan||"trial").toUpperCase();
- document.getElementById("subscriptionPlan").textContent=plan==="PRO"?"PRO":"TRIAL";
- const info=document.getElementById("subscriptionInfo");
- if(plan==="PRO"){info.textContent=s.subscription&&s.subscription.current_period_end?"Dönem sonu: "+new Date(s.subscription.current_period_end).toLocaleDateString("tr-TR"):"Aktif Pro abonelik";}
- else if(s.trial_ends_at){info.textContent="Deneme sonu: "+new Date(s.trial_ends_at).toLocaleDateString("tr-TR");}
- const btn=document.getElementById("proBtn");
- btn.textContent=plan==="PRO"?"Aboneliği İptal Et":"Pro'ya Geç";
- btn.onclick=async()=>{const endpoint=plan==="PRO"?"/api/billing/cancel":"/api/billing/start"; const r=await fetch(endpoint,{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"}); const x=await r.json().catch(()=>({})); if(r.ok&&x.checkout_form_content){document.open();document.write('<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NEXORA Pro</title></head><body style="font-family:Arial,sans-serif;padding:20px"><div id="iyzico-checkout-form" class="responsive"></div>'+x.checkout_form_content+'</body></html>');document.close();return;} if(r.ok&&x.checkout_url){window.location.href=x.checkout_url;return;} if(r.ok){alert("İşlem tamamlandı.");loadSubscription();return;} alert(x.error||"İşlem gerçekleştirilemedi.");};
+ const planText=plan==="PRO"?"PRO":"TRIAL";
+ const infoText=plan==="PRO"?(s.subscription&&s.subscription.current_period_end?"Dönem sonu: "+new Date(s.subscription.current_period_end).toLocaleDateString("tr-TR"):"Aktif Pro abonelik"):(s.trial_ends_at?"Deneme sonu: "+new Date(s.trial_ends_at).toLocaleDateString("tr-TR"):"");
+ const p=document.getElementById("subscriptionPlan"); if(p)p.textContent=planText;
+ const i=document.getElementById("subscriptionInfo"); if(i)i.textContent=infoText;
+ const i2=document.getElementById("nxSubscriptionInfo"); if(i2)i2.textContent=infoText;
+ const btn=document.getElementById("proBtn"); const btn2=document.getElementById("nxProBtn");
+ const action=async()=>{const endpoint=plan==="PRO"?"/api/billing/cancel":"/api/billing/start"; const rr=await fetch(endpoint,{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"}); const x=await rr.json().catch(()=>({})); if(rr.ok&&x.checkout_form_content){document.open();document.write('<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NEXORA Pro</title></head><body style="font-family:Arial,sans-serif;padding:20px"><div id="iyzico-checkout-form" class="responsive"></div>'+x.checkout_form_content+'</body></html>');document.close();return;} if(rr.ok&&x.checkout_url){window.location.href=x.checkout_url;return;} if(rr.ok){alert("İşlem tamamlandı.");loadSubscription();return;} alert(x.error||"İşlem gerçekleştirilemedi.");};
+ const label=plan==="PRO"?"Aboneliği İptal Et":"Pro'ya Geç";
+ if(btn){btn.textContent=label;btn.onclick=action;} if(btn2){btn2.textContent=label;btn2.onclick=action;}
 }
 function appointmentNotification(appointment,title="Yeni randevu"){
   try{
