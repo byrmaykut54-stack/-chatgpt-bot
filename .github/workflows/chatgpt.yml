@@ -7,8 +7,6 @@ on:
         description: "Pull request number to review"
         required: true
         type: string
-  pull_request:
-    types: [opened, synchronize, reopened]
 
 permissions:
   contents: read
