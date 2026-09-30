@@ -147,7 +147,7 @@ input{width:100%;padding:12px 13px;border:1px solid #e0e5ea;background:#fbfcfd;b
 </section>
 
 <section class="nx-page" data-nx-page="usage">
-  <div class="card"><h2>◔ Kullanım</h2><div id="usageInfo" class="muted">Kullanım bilgisi yükleniyor...</div></div>
+  <div class="card"><h2>◔ Kullanım</h2><div id="nxUsageInfo" class="muted">Kullanım bilgisi yükleniyor...</div></div>
 </section>
 
 <section class="nx-page" data-nx-page="audit">
@@ -165,9 +165,9 @@ function actionButtons(x){return x.status==="pending"?'<button class="approve" o
 function appointmentTable(items){if(!items.length)return '<div class="muted">Randevu bulunmuyor.</div>';return '<div class="scroll"><table><tr><th>Müşteri</th><th>Saat</th><th>Hizmet</th><th>Durum</th><th>İşlem</th></tr>'+items.map(x=>'<tr><td>'+escapeHtml(x.customer_name)+'</td><td>'+escapeHtml(x.time)+'</td><td>'+escapeHtml(x.service)+'</td><td>'+badge(x.status)+'</td><td>'+actionButtons(x)+'</td></tr>').join("")+"</table></div>";}
 async function loadUsage(){
  const r=await fetch("/api/usage"); if(!r.ok)return;
- const u=await r.json(), el=document.getElementById("usageInfo"); if(!el)return;
+ const u=await r.json(); const el=document.getElementById("usageInfo"); const el2=document.getElementById("nxUsageInfo"); if(!el&&!el2)return;
  const a=u.used?.appointments||0, al=u.limits?.appointments||0, m=u.used?.ai_messages||0, ml=u.limits?.ai_messages||0;
- el.innerHTML="Randevu: <b>"+a+"/"+al+"</b><br>AI mesajı: <b>"+m+"/"+ml+"</b>";
+ const html="Randevu: <b>"+a+"/"+al+"</b><br>AI mesajı: <b>"+m+"/"+ml+"</b>"; if(el)el.innerHTML=html; if(el2)el2.innerHTML=html;
 }
 async function loadAudit(){
  const r=await fetch("/api/audit"); if(!r.ok)return;
