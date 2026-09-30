@@ -219,6 +219,26 @@ def delete_users_by_email_prefix(prefix):
         conn.commit()
         return deleted
 
+def reset_all_data():
+    """Destructive one-time reset of all application data."""
+    with connection() as conn:
+        tables = [
+            "rate_limits", "audit_logs", "usage_counters", "google_calendar_events",
+            "google_oauth_states", "google_calendar_connections", "appointment_reminders",
+            "password_reset_tokens", "email_verification_tokens", "sessions",
+            "billing_checkout_sessions", "subscriptions", "appointments", "messages",
+            "customers", "users", "businesses"
+        ]
+        counts = {}
+        for table in tables:
+            try:
+                counts[table] = conn.execute("SELECT COUNT(*) FROM " + table).fetchone()[0]
+                conn.execute("DELETE FROM " + table)
+            except Exception:
+                counts[table] = 0
+        conn.commit()
+        return counts
+
 def _fernet():
     key = os.environ.get("NEXORA_ENCRYPTION_KEY", "").strip()
     if not key or Fernet is None:
