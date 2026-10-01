@@ -93,7 +93,7 @@ def verify_password(password, stored):
         return False
 
 def send_email(to_address, subject, body):
-    """Send transactional mail via Resend when configured, otherwise SMTP."""
+    """Send transactional mail via Resend, with SMTP fallback when configured."""
     resend_key=os.environ.get("RESEND_API_KEY","").strip()
     resend_from=os.environ.get("RESEND_FROM","").strip()
     if resend_key and resend_from:
@@ -109,9 +109,16 @@ def send_email(to_address, subject, body):
                 result=json.load(response)
             print("EMAIL_OK: Resend delivery request accepted", flush=True)
             return True
+        except urllib.error.HTTPError as exc:
+            try:
+                raw=exc.read().decode("utf-8","replace")
+            except Exception:
+                raw=""
+            print(f"EMAIL_ERROR: Resend HTTP {exc.code}: {raw[:1200]}", flush=True)
+            # Fall through to SMTP if it is configured. This prevents a broken
+            # Resend sender/domain from permanently disabling password recovery.
         except Exception as exc:
             print(f"EMAIL_ERROR: Resend {type(exc).__name__}: {exc}", flush=True)
-            return False
 
     host=os.environ.get("SMTP_HOST","").strip()
     try:
@@ -1149,6 +1156,9 @@ class Handler(BaseHTTPRequestHandler):
                     if base:
                         if not send_email(user[2],"NEXORA şifre sıfırlama",f"NEXORA şifrenizi yenilemek için bağlantı:\n{base}/?reset_token={token}\n\nBağlantı 30 dakika geçerlidir."):
                             print("PASSWORD_RESET_EMAIL_FAILED: SMTP/Resend yapılandırması veya gönderim başarısız.", flush=True)
+                            self.send_json(503,{"error":"Şifre sıfırlama e-postası şu anda gönderilemedi. E-posta gönderici yapılandırmasını kontrol edin."}); return
+                elif user and not base:
+                    self.send_json(503,{"error":"NEXORA uygulama adresi yapılandırılmamış."}); return
                 self.send_json(200,{"success":True,"message":"Eğer hesap varsa sıfırlama bağlantısı e-posta adresinize gönderildi."}); return
 
             if self.path == "/api/auth/reset-password":
