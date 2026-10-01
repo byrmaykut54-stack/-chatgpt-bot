@@ -927,8 +927,10 @@ def create_or_update_subscription(
                 (business_id,)
             )
         elif status in {"cancelled","canceled"}:
-            # Keep service access until the recorded paid period ends.
-            if end is None or end > datetime.now(timezone.utc):
+            # A cancelled subscription keeps access only while its paid period
+            # is explicitly known to still be active. Never grant indefinite
+            # Pro access when the provider omitted the period end.
+            if end is not None and end > datetime.now(timezone.utc):
                 conn.execute(
                     "UPDATE businesses SET plan='pro', status='active', trial_ends_at=NULL WHERE id=%s",
                     (business_id,)
