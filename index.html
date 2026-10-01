@@ -580,7 +580,12 @@ td{border-bottom-color:#222!important;color:#ddd!important}
 .nx-modal-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}.nx-modal-actions .nx-modal-wide{grid-column:1/-1}.nx-modal-actions button{min-height:44px}.nx-modal-note{font-size:10px;color:#777;line-height:1.5;margin-top:12px}
 .nx-create-status{min-height:18px;margin-top:9px;font-size:11px;color:#8d8d8d}.nx-create-status.ok{color:var(--tc-green)}.nx-create-status.err{color:#e58a8a}body.nx-modal-open{overflow:hidden}
 @media(max-width:560px){.nx-modal-backdrop{padding:10px;align-items:flex-end}.nx-modal{border-radius:22px 22px 18px 18px;max-height:88vh}.nx-detail-grid{grid-template-columns:1fr}.nx-detail-service{grid-column:auto}.nx-modal-title{font-size:20px}}
-</style><style id="nx-table-link-css">.nx-table-link{padding:0!important;min-height:0!important;background:transparent!important;color:#f1d78e!important;border-radius:0!important;text-align:left;font-size:12px;font-weight:800}.nx-table-link:hover{text-decoration:underline}</style></head>
+</style><style id="nx-table-link-css">.nx-table-link{padding:0!important;min-height:0!important;background:transparent!important;color:#f1d78e!important;border-radius:0!important;text-align:left;font-size:12px;font-weight:800}.nx-table-link:hover{text-decoration:underline}</style><style id="nx-slots-css">
+.nx-slot-panel{margin-top:9px;padding:10px;border:1px solid #292929;border-radius:14px;background:#101010}
+.nx-slot-head{display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:8px}.nx-slot-head span{font-size:9px;letter-spacing:.13em;color:#777}.nx-slot-head b{font-size:10px;color:#bbb}
+.nx-slot-list{display:flex;flex-wrap:wrap;gap:6px}.nx-slot{min-height:34px!important;padding:7px 10px!important;border:1px solid #333!important;background:#171717!important;color:#eee!important;border-radius:10px!important;font-size:11px!important}.nx-slot:hover,.nx-slot.active{border-color:var(--tc-gold)!important;color:var(--tc-gold)!important}
+.nx-slot-empty{font-size:10px;color:#777;padding:4px 0}.nx-slot-loading{font-size:10px;color:#777}
+</style></head>
 <body><div id="authScreen" class="auth-shell">
 <div class="auth-glow auth-glow-one"></div><div class="auth-glow auth-glow-two"></div>
 <div class="auth-card">
@@ -1081,6 +1086,26 @@ document.getElementById("nxAppointmentModal")?.addEventListener("click",e=>{if(e
 nxInitAppointmentCenter(); nxInitCustomerTools();
 const nxDateInput=document.getElementById("date");
 if(nxDateInput){nxDateInput.min=localDateISO();nxDateInput.value=localDateISO();}
+if(nxDateInput){
+  nxDateInput.insertAdjacentHTML("afterend",'<div class="nx-slot-panel"><div class="nx-slot-head"><span>MÜSAİT SAATLER</span><b id="nxSlotDateLabel">Bugün</b></div><div id="nxSlotList" class="nx-slot-list"><span class="nx-slot-loading">Saatler yükleniyor...</span></div></div>');
+  window.nxLoadSlots=async function(date){
+    const list=document.getElementById("nxSlotList"), label=document.getElementById("nxSlotDateLabel");
+    if(!list)return;
+    if(label)label.textContent=nxFormatDateLabel(date);
+    list.innerHTML='<span class="nx-slot-loading">Müsait saatler kontrol ediliyor...</span>';
+    try{
+      const r=await fetch("/api/availability?date="+encodeURIComponent(date),{credentials:"same-origin",cache:"no-store"});
+      const x=await r.json().catch(()=>({}));
+      if(!r.ok){list.innerHTML='<span class="nx-slot-empty">'+escapeHtml(x.error||"Müsaitlik alınamadı.")+'</span>';return;}
+      if(x.closed){list.innerHTML='<span class="nx-slot-empty">Bu gün işletme kapalı.</span>';return;}
+      if(!x.slots?.length){list.innerHTML='<span class="nx-slot-empty">Bu gün için boş saat bulunmuyor.</span>';return;}
+      list.innerHTML=x.slots.map(t=>'<button type="button" class="nx-slot" data-slot="'+escapeHtml(t)+'">'+escapeHtml(t)+'</button>').join("");
+      list.querySelectorAll("[data-slot]").forEach(btn=>btn.addEventListener("click",()=>{document.getElementById("time").value=btn.dataset.slot;list.querySelectorAll(".nx-slot").forEach(b=>b.classList.remove("active"));btn.classList.add("active");}));
+    }catch(e){list.innerHTML='<span class="nx-slot-empty">Müsaitlik kontrol edilemedi.</span>';}
+  };
+  nxLoadSlots(nxDateInput.value);
+  nxDateInput.addEventListener("change",()=>nxLoadSlots(nxDateInput.value));
+}
 const nxApptForm=document.getElementById("appointmentForm");
 nxApptForm?.insertAdjacentHTML("beforeend",'<div id="nxCreateStatus" class="nx-create-status"></div>');
 nxApptForm?.addEventListener("submit",async e=>{
