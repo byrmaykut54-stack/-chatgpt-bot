@@ -914,7 +914,20 @@ async function loadSubscription(){
  const i=document.getElementById("subscriptionInfo"); if(i)i.textContent=infoText;
  const i2=document.getElementById("nxSubscriptionInfo"); if(i2)i2.textContent=infoText;
  const btn=document.getElementById("proBtn"); const btn2=document.getElementById("nxProBtn");
- const action=async()=>{const endpoint=plan==="PRO"?"/api/billing/cancel":"/api/billing/start"; const rr=await fetch(endpoint,{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"}); const x=await rr.json().catch(()=>({})); if(rr.ok&&x.checkout_form_content){document.open();document.write('<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NEXORA Pro</title></head><body style="font-family:Arial,sans-serif;padding:20px"><div id="iyzico-checkout-form" class="responsive"></div>'+x.checkout_form_content+'<div id="nxAppointmentModal" class="nx-modal-backdrop" aria-hidden="true" role="dialog" aria-modal="true"><div class="nx-modal" role="document"><div class="nx-modal-head"><div><div class="nx-modal-kicker">RANDEVU DETAYI</div><div id="nxModalTitle" class="nx-modal-title">Randevu</div></div><button type="button" class="nx-modal-close" id="nxModalClose" aria-label="Kapat">×</button></div><div class="nx-modal-body"><div class="nx-detail-grid"><div class="nx-detail-item"><span>MÜŞTERİ</span><b id="nxModalCustomer">—</b></div><div class="nx-detail-item"><span>TELEFON</span><b id="nxModalPhone">—</b></div><div class="nx-detail-item"><span>TARİH</span><b id="nxModalDate">—</b></div><div class="nx-detail-item"><span>SAAT</span><b id="nxModalTime">—</b></div><div class="nx-detail-item nx-detail-service"><span>HİZMET</span><b id="nxModalService">—</b></div></div><div class="nx-modal-status"><span class="nx-modal-status-label">DURUM</span><span id="nxModalStatus"></span></div><div class="nx-modal-actions" id="nxModalActions"></div><div class="nx-modal-note">Randevu durumunu bu pencereden güncelleyebilir veya ayrıntılı randevu merkezine geçebilirsiniz.</div></div></div></div></body></html>');document.close();return;} if(rr.ok&&x.checkout_url){window.location.href=x.checkout_url;return;} if(rr.ok){alert("İşlem tamamlandı.");loadSubscription();return;} alert(x.error||"İşlem gerçekleştirilemedi.");};
+ const action=async()=>{const endpoint=plan==="PRO"?"/api/billing/cancel":"/api/billing/start"; const rr=await fetch(endpoint,{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"}); const x=await rr.json().catch(()=>({})); if(rr.ok&&x.checkout_form_content){
+  const modal=document.createElement("div");
+  modal.className="nx-modal-backdrop is-open";
+  modal.setAttribute("role","dialog");
+  modal.setAttribute("aria-modal","true");
+  modal.innerHTML='<div class="nx-modal" role="document"><div class="nx-modal-head"><div><div class="nx-modal-kicker">GÜVENLİ ÖDEME</div><div class="nx-modal-title">NEXORA Pro</div></div><button type="button" class="nx-modal-close" aria-label="Kapat">×</button></div><div class="nx-modal-body"><div class="nx-modal-note" style="margin-bottom:14px">Ödeme formu güvenli iyzico ekranında açılıyor.</div><div id="nxIyzicoCheckout"></div></div></div>';
+  document.body.appendChild(modal);
+  const close=()=>modal.remove();
+  modal.querySelector(".nx-modal-close")?.addEventListener("click",close);
+  modal.addEventListener("click",e=>{if(e.target===modal)close();});
+  const host=modal.querySelector("#nxIyzicoCheckout");
+  if(host)host.innerHTML=x.checkout_form_content;
+  return;
+} if(rr.ok&&x.checkout_url){window.location.href=x.checkout_url;return;} if(rr.ok){alert("İşlem tamamlandı.");loadSubscription();return;} alert(x.error||"İşlem gerçekleştirilemedi.");};
  const label=plan==="PRO"?"Aboneliği İptal Et":"Pro'ya Geç";
  if(btn){btn.textContent=label;btn.onclick=action;} if(btn2){btn2.textContent=label;btn2.onclick=action;}
 }
