@@ -844,26 +844,6 @@ def get_business_by_provider_subscription(provider_subscription_id):
     with connection() as conn:
         row=conn.execute("SELECT business_id FROM subscriptions WHERE provider_subscription_id=%s LIMIT 1",(str(provider_subscription_id or ""),)).fetchone()
     return row[0] if row else None
- GROUP BY 1 ORDER BY COUNT(*) DESC, 1 LIMIT 1",
-            (business_id,)
-        ).fetchone()
-        total = appointments[0] or 0
-        completed = appointments[3] or 0
-        cancelled = appointments[4] or 0
-        return {
-            "appointments_total": total,
-            "appointments_pending": appointments[1],
-            "appointments_confirmed": appointments[2],
-            "appointments_completed": completed,
-            "appointments_cancelled": cancelled,
-            "customers_total": customers,
-            "messages_total": messages,
-            "completion_rate": round((completed / total) * 100, 1) if total else 0,
-            "cancellation_rate": round((cancelled / total) * 100, 1) if total else 0,
-            "peak_hour": (f"{hour_rows[0]:02d}:00" if hour_rows else None),
-            "top_service": (service_rows[0][0] if service_rows else None),
-            "service_distribution": [{"service": r[0], "count": r[1]} for r in service_rows]
-        }
 
 def list_users(business_id):
     with connection() as conn:
@@ -1359,26 +1339,6 @@ def get_business_by_provider_subscription(provider_subscription_id):
     with connection() as conn:
         row=conn.execute("SELECT business_id FROM subscriptions WHERE provider_subscription_id=%s LIMIT 1",(str(provider_subscription_id or ""),)).fetchone()
     return row[0] if row else None
- GROUP BY 1 ORDER BY COUNT(*) DESC, 1 LIMIT 1",
-            (business_id,)
-        ).fetchone()
-        total = appointments[0] or 0
-        completed = appointments[3] or 0
-        cancelled = appointments[4] or 0
-        return {
-            "appointments_total": total,
-            "appointments_pending": appointments[1],
-            "appointments_confirmed": appointments[2],
-            "appointments_completed": completed,
-            "appointments_cancelled": cancelled,
-            "customers_total": customers,
-            "messages_total": messages,
-            "completion_rate": round((completed / total) * 100, 1) if total else 0,
-            "cancellation_rate": round((cancelled / total) * 100, 1) if total else 0,
-            "peak_hour": (f"{hour_rows[0]:02d}:00" if hour_rows else None),
-            "top_service": (service_rows[0][0] if service_rows else None),
-            "service_distribution": [{"service": r[0], "count": r[1]} for r in service_rows]
-        }
 
 def list_users(business_id):
     with connection() as conn:
