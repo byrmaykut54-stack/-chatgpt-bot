@@ -347,7 +347,7 @@ linear-gradient(135deg,#0a111f 0%,#172235 58%,#202d40 100%);color:#fff;box-shado
           <div class="group nx-appt-views"><button type="button" id="nxListView" class="active">☷ Liste</button><button type="button" id="nxCalendarView">▦ Takvim</button></div>
         </div>
         <div class="nx-filter"><input id="nxApptSearch" placeholder="⌕  Müşteri veya telefon ara"><input id="nxApptDate" type="date"><select id="nxApptStatus"><option value="">Tüm durumlar</option><option value="pending">Bekleyen</option><option value="confirmed">Onaylanan</option><option value="cancelled">İptal</option></select></div>
-        <div id="nxAppointmentContent"><div id="todayAppointments" class="muted">Yükleniyor...</div></div>
+        <div id="nxAppointmentContent"><div id="nxAppointmentList" class="muted">Yükleniyor...</div></div>
       </div>
       <div class="card nx-appt-create" id="appointmentCreateCard">
         <div class="nx-create-head"><div><span>HIZLI KAYIT</span><h3>Yeni randevu</h3><p>Müşteriniz için uygun zamanı hemen planlayın.</p></div><div class="nx-create-icon">＋</div></div>
@@ -537,6 +537,95 @@ function checkUpcomingReminders(items){
   }catch(e){}
 }
 
+
+let nxAppointmentCache=[];
+let nxAppointmentCenterDate=localDateISO();
+let nxAppointmentView="list";
+
+function nxFormatDateLabel(iso){
+  if(!iso)return "Bugün";
+  const d=new Date(iso+"T12:00:00");
+  return d.toLocaleDateString("tr-TR",{weekday:"long",day:"numeric",month:"long"});
+}
+function nxRenderAppointmentCenter(items){
+  nxAppointmentCache=Array.isArray(items)?items:[];
+  const q=(document.getElementById("nxApptSearch")?.value||"").trim().toLocaleLowerCase("tr-TR");
+  const date=document.getElementById("nxApptDate")?.value||nxAppointmentCenterDate;
+  const status=document.getElementById("nxApptStatus")?.value||"";
+  let filtered=nxAppointmentCache.filter(x=>
+    (!date||x.date===date)&&
+    (!status||x.status===status)&&
+    (!q||String(x.customer_name||"").toLocaleLowerCase("tr-TR").includes(q)||String(x.phone||"").includes(q))
+  ).sort((a,b)=>String(a.time||"").localeCompare(String(b.time||"")));
+  const target=document.getElementById("nxAppointmentList");
+  const label=document.getElementById("nxApptDateLabel");
+  if(label)label.textContent=nxFormatDateLabel(date);
+  if(!target)return;
+  if(nxAppointmentView==="calendar"){
+    const days=[];
+    const base=new Date(date+"T12:00:00");
+    for(let n=-2;n<=4;n++){
+      const d=new Date(base);d.setDate(d.getDate()+n);
+      const iso=d.toISOString().slice(0,10);
+      const dayItems=nxAppointmentCache.filter(x=>x.date===iso).sort((a,b)=>String(a.time||"").localeCompare(String(b.time||"")));
+      days.push('<div class="nx-day '+(iso===date?'today':'')+'"><div class="nx-dayhead"><span>'+escapeHtml(d.toLocaleDateString("tr-TR",{weekday:"short"}))+'</span><b>'+d.getDate()+'</b></div>'+
+        (dayItems.length?dayItems.slice(0,5).map(x=>'<div class="nx-appt '+escapeHtml(x.status||'')+'" title="'+escapeHtml(x.customer_name||'')+'">'+escapeHtml(x.time||'')+' · '+escapeHtml(x.customer_name||'')+'</div>').join(""):'<div class="muted" style="font-size:9px">Boş</div>')+
+      '</div>');
+    }
+    target.innerHTML='<div class="nx-daygrid">'+days.join("")+'</div>';
+  }else{
+    target.innerHTML=appointmentTable(filtered);
+  }
+}
+function nxMoveAppointmentDay(delta){
+  const d=new Date((document.getElementById("nxApptDate")?.value||nxAppointmentCenterDate)+"T12:00:00");
+  d.setDate(d.getDate()+delta);
+  nxAppointmentCenterDate=d.toISOString().slice(0,10);
+  const input=document.getElementById("nxApptDate");if(input)input.value=nxAppointmentCenterDate;
+  nxRenderAppointmentCenter(nxAppointmentCache);
+}
+function nxInitAppointmentCenter(){
+  const dateInput=document.getElementById("nxApptDate");
+  if(dateInput&&!dateInput.value)dateInput.value=nxAppointmentCenterDate;
+  document.getElementById("nxPrevDay")?.addEventListener("click",()=>nxMoveAppointmentDay(-1));
+  document.getElementById("nxNextDay")?.addEventListener("click",()=>nxMoveAppointmentDay(1));
+  document.getElementById("nxToday")?.addEventListener("click",()=>{
+    nxAppointmentCenterDate=localDateISO();
+    if(dateInput)dateInput.value=nxAppointmentCenterDate;
+    nxRenderAppointmentCenter(nxAppointmentCache);
+  });
+  document.getElementById("nxListView")?.addEventListener("click",()=>{
+    nxAppointmentView="list";
+    document.getElementById("nxListView")?.classList.add("active");
+    document.getElementById("nxCalendarView")?.classList.remove("active");
+    nxRenderAppointmentCenter(nxAppointmentCache);
+  });
+  document.getElementById("nxCalendarView")?.addEventListener("click",()=>{
+    nxAppointmentView="calendar";
+    document.getElementById("nxCalendarView")?.classList.add("active");
+    document.getElementById("nxListView")?.classList.remove("active");
+    nxRenderAppointmentCenter(nxAppointmentCache);
+  });
+  document.getElementById("nxApptDate")?.addEventListener("change",e=>{
+    nxAppointmentCenterDate=e.target.value||localDateISO();
+    nxRenderAppointmentCenter(nxAppointmentCache);
+  });
+  document.getElementById("nxApptSearch")?.addEventListener("input",()=>nxRenderAppointmentCenter(nxAppointmentCache));
+  document.getElementById("nxApptStatus")?.addEventListener("change",()=>nxRenderAppointmentCenter(nxAppointmentCache));
+}
+function nxInitCustomerTools(){
+  const input=document.getElementById("nxCustomerSearch");
+  const refresh=document.getElementById("nxCustomerRefresh");
+  input?.addEventListener("input",()=>{
+    const q=input.value.trim().toLocaleLowerCase("tr-TR");
+    const list=document.getElementById("customers");if(!list)return;
+    Array.from(list.querySelectorAll("table tr")).forEach((row,index)=>{
+      if(index===0)return;
+      row.style.display=(!q||row.textContent.toLocaleLowerCase("tr-TR").includes(q))?"":"none";
+    });
+  });
+  refresh?.addEventListener("click",()=>loadDashboard());
+}
 async function loadDashboard(){
  try{
  const [ar,mr,cr,rr]=await Promise.all([fetch("/api/appointments",{credentials:"same-origin",cache:"no-store"}),fetch("/api/messages",{credentials:"same-origin",cache:"no-store"}),fetch("/api/customers",{credentials:"same-origin",cache:"no-store"}),fetch("/api/reports",{credentials:"same-origin",cache:"no-store"})]);
@@ -546,6 +635,7 @@ async function loadDashboard(){
  const report=rr.ok?await rr.json():null;
  checkAppointmentNotifications(items);checkUpcomingReminders(items);
  const todayItems=items.filter(x=>x.date===today),pending=items.filter(x=>x.status==="pending"),confirmed=items.filter(x=>x.status==="confirmed");
+ nxAppointmentCache=items; nxRenderAppointmentCenter(items);
  const setText=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=String(v??0);};
  if(report){setText("reportTotal",report.appointments_total);setText("reportCompleted",report.appointments_completed);setText("reportCancelled",report.appointments_cancelled);setText("reportTotalPage",report.appointments_total);setText("reportCompletedPage",report.appointments_completed);setText("reportPendingPage",report.appointments_pending);setText("reportCancelledPage",report.appointments_cancelled);setText("reportCustomersPage",report.customers_total);setText("reportMessagesPage",report.messages_total);}
 
@@ -565,7 +655,8 @@ async function loadDashboard(){
 
 fetch("/api/business").then(r=>r.json()).then(b=>{const el=document.getElementById("business");if(el)el.textContent=b.business_name+" • "+b.sector+" • "+b.working_hours;}).catch(()=>{});
 
-document.getElementById("notifyBtn").addEventListener("click",enableNotifications);
+document.getElementById("notifyBtn").addEventListener("click",enableNotifications);\nnxInitAppointmentCenter(); nxInitCustomerTools();
+document.getElementById("date")?.setAttribute("min",localDateISO()); document.getElementById("date")?.setAttribute("value",localDateISO());
 document.getElementById("appointmentForm").addEventListener("submit",async e=>{e.preventDefault();const data={customer_name:document.getElementById("customer_name").value,phone:document.getElementById("phone").value,date:document.getElementById("date").value,time:document.getElementById("time").value,service:document.getElementById("service").value};const r=await fetch("/api/appointments",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(data)});if(r.ok){const x=await r.json().catch(()=>null);e.target.reset();loadDashboard();if(x&&x.appointment)appointmentNotification(x.appointment,"Yeni randevu");alert("Randevu kaydedildi.");}else{const x=await r.json();alert(x.error||"Randevu kaydedilemedi.");}});
 let deferredPrompt;window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferredPrompt=e;document.getElementById("installBtn").hidden=false;});document.getElementById("installBtn").addEventListener("click",async()=>{if(!deferredPrompt)return;deferredPrompt.prompt();await deferredPrompt.userChoice;deferredPrompt=null;document.getElementById("installBtn").hidden=true;});if("serviceWorker" in navigator)navigator.serviceWorker.register("./service-worker.js").catch(()=>{});
 async function handleAuthTokens(){
@@ -666,7 +757,7 @@ function nxSetPage(page,writeHash=true){
  document.querySelectorAll("#nexoraNav [data-page]").forEach(btn=>btn.classList.toggle("active",btn.dataset.page===page));
  const meta={dashboard:["Genel Bakış","İşletmenizin bugünkü özeti"],appointments:["Randevular","Randevularınızı görüntüleyin, yönetin ve yeni randevu oluşturun"],customers:["Müşteriler","Müşteri kayıtları ve iletişim bilgileri"],messages:["Mesajlar & AI","Müşteri mesajlarını ve NEXORA AI asistanını yönetin"],team:["Ekip","Çalışan hesapları ve yetkileri"],settings:["Ayarlar","İşletme, çalışma düzeni ve entegrasyon ayarları"],subscription:["Abonelik","Planınızı ve abonelik durumunuzu yönetin"],usage:["Kullanım","Aylık randevu ve AI kullanımınızı izleyin"],audit:["Denetim","İşletme işlemlerinin güvenlik kayıtları"],reports:["Raporlar","Randevu, müşteri ve operasyon özetleri"]};
  const m=meta[page]||meta.dashboard;document.getElementById("nxPageHead").querySelector("h2").textContent=m[0];document.getElementById("nxPageHint").textContent=m[1];
- if(writeHash)history.replaceState(null,"","#"+page);
+ if(writeHash)history.replaceState(null,"","#"+page);\n const heroDate=document.getElementById("nxHeroDate"); if(heroDate)heroDate.textContent=new Date().toLocaleDateString("tr-TR",{weekday:"long",day:"numeric",month:"long"});
  // Menü seçildiğinde sayfanın mevcut dikey konumu korunur.
 }
 document.querySelectorAll("#nexoraNav [data-page]").forEach(btn=>btn.addEventListener("click",()=>{nxSetPage(btn.dataset.page);nxCloseMenu();}));
