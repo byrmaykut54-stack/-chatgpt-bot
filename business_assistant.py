@@ -102,7 +102,7 @@ def send_email(to_address, subject, body):
             req=urllib.request.Request(
                 "https://api.resend.com/emails",
                 data=payload,
-                headers={"Authorization":"Bearer "+resend_key,"Content-Type":"application/json"},
+                headers={"Authorization":"Bearer "+resend_key,"Content-Type":"application/json","User-Agent":"NEXORA/1.0"},
                 method="POST"
             )
             with urllib.request.urlopen(req,timeout=20) as response:
@@ -1457,5 +1457,4 @@ if __name__ == "__main__":
     port=int(os.environ.get("PORT","8080"))
     print(f"AI İşletme Asistanı: http://0.0.0.0:{port}")
     HTTPServer(("0.0.0.0",port),Handler).serve_forever()
-
 
