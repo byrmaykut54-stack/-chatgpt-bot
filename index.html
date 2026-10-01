@@ -925,7 +925,21 @@ async function loadSubscription(){
   modal.querySelector(".nx-modal-close")?.addEventListener("click",close);
   modal.addEventListener("click",e=>{if(e.target===modal)close();});
   const host=modal.querySelector("#nxIyzicoCheckout");
-  if(host)host.innerHTML=x.checkout_form_content;
+  if(host){
+    const tpl=document.createElement("template");
+    tpl.innerHTML=x.checkout_form_content||"";
+    host.replaceChildren();
+    Array.from(tpl.content.childNodes).forEach(node=>{
+      if(node.nodeType===1 && node.tagName==="SCRIPT"){
+        const script=document.createElement("script");
+        Array.from(node.attributes).forEach(attr=>script.setAttribute(attr.name,attr.value));
+        script.text=node.textContent||"";
+        document.body.appendChild(script);
+      }else{
+        host.appendChild(node.cloneNode(true));
+      }
+    });
+  }
   return;
 } if(rr.ok&&x.checkout_url){window.location.href=x.checkout_url;return;} if(rr.ok){alert("İşlem tamamlandı.");loadSubscription();return;} alert(x.error||"İşlem gerçekleştirilemedi.");};
  const label=plan==="PRO"?"Aboneliği İptal Et":"Pro'ya Geç";
