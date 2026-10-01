@@ -853,7 +853,10 @@ def get_business_subscription(business_id):
         plan == "pro"
         and status == "active"
         and paid_status in {"active","trialing","cancelled","canceled"}
-        and (period_end is None or period_end > now)
+        # A paid subscription must have an explicit provider period end.
+        # Without it, do not grant indefinite Pro access.
+        and period_end is not None
+        and period_end > now
     )
     if paid_active:
         return {
