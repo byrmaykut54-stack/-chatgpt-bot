@@ -1027,7 +1027,7 @@ fetch("/api/business").then(r=>r.json()).then(b=>{const el=document.getElementBy
 document.getElementById("notifyBtn").addEventListener("click",enableNotifications);
 nxInitAppointmentCenter(); nxInitCustomerTools();
 document.getElementById("date")?.setAttribute("min",localDateISO()); document.getElementById("date")?.setAttribute("value",localDateISO());
-document.getElementById("appointmentForm").addEventListener("submit",async e=>{e.preventDefault();const data={customer_name:document.getElementById("customer_name").value,phone:document.getElementById("phone").value,date:document.getElementById("date").value,time:document.getElementById("time").value,service:document.getElementById("service").value};const r=await fetch("/api/appointments",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(data)});if(r.ok){const x=await r.json().catch(()=>null);e.target.reset();loadDashboard();if(x&&x.appointment)appointmentNotification(x.appointment,"Yeni randevu");alert("Randevu kaydedildi.");}else{const x=await r.json();alert(x.error||"Randevu kaydedilemedi.");}});
+document.getElementById("appointmentForm").addEventListener("submit",async e=>{e.preventDefault();const data={customer_name:document.getElementById("customer_name").value,phone:document.getElementById("phone").value,date:document.getElementById("date").value,time:document.getElementById("time").value,service:document.getElementById("service").value};const r=await fetch("/api/appointments",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify(data)});if(r.ok){const x=await r.json().catch(()=>null);e.target.reset();loadDashboard();if(x&&x.appointment)appointmentNotification(x.appointment,"Yeni randevu");alert("Randevu kaydedildi.");}else{const x=await r.json();alert(x.error||"Randevu kaydedilemedi.");}});
 let deferredPrompt;window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferredPrompt=e;document.getElementById("installBtn").hidden=false;});document.getElementById("installBtn").addEventListener("click",async()=>{if(!deferredPrompt)return;deferredPrompt.prompt();await deferredPrompt.userChoice;deferredPrompt=null;document.getElementById("installBtn").hidden=true;});if("serviceWorker" in navigator)navigator.serviceWorker.register("./service-worker.js").catch(()=>{});
 async function handleAuthTokens(){
  const q=new URLSearchParams(location.search);
@@ -1183,14 +1183,14 @@ const nxHeroDate=document.getElementById("nxHeroDate");if(nxHeroDate)nxHeroDate.
 setInterval(()=>{if(document.getElementById("app").style.display!=="none")loadDashboard();},30000);
 const businessForm=document.getElementById("businessForm");
 async function loadCalendarStatus(){
- const r=await fetch("/api/calendar/status"); if(!r.ok)return; const x=await r.json(); const el=document.getElementById("calendarStatus"); if(!el)return; el.textContent=x.connected?"🟢 "+(x.calendar_name||"Google Calendar")+" bağlı.":"⚪ Google Calendar bağlı değil.";
+ const r=await fetch("/api/calendar/status",{credentials:"same-origin",cache:"no-store"}); if(!r.ok)return; const x=await r.json(); const el=document.getElementById("calendarStatus"); if(!el)return; el.textContent=x.connected?"🟢 "+(x.calendar_name||"Google Calendar")+" bağlı.":"⚪ Google Calendar bağlı değil.";
 }
 document.getElementById("calendarConnectBtn").addEventListener("click",async()=>{const r=await fetch("/api/calendar/connect");const x=await r.json().catch(()=>({}));if(r.ok&&x.url)location.href=x.url;else alert(x.error||"Google Calendar bağlantısı başlatılamadı.");});
 document.getElementById("calendarSyncBtn").addEventListener("click",async()=>{const r=await fetch("/api/calendar/sync",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"});const x=await r.json().catch(()=>({}));alert(r.ok?"Google Calendar senkronizasyonu tamamlandı.":(x.error||"Senkronizasyon başarısız."));loadCalendarStatus();});
 document.getElementById("calendarDisconnectBtn").addEventListener("click",async()=>{if(!confirm("Google Calendar bağlantısı kaldırılsın mı?"))return;const r=await fetch("/api/calendar/disconnect",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"});const x=await r.json().catch(()=>({}));if(!r.ok)alert(x.error||"Bağlantı kaldırılamadı.");loadCalendarStatus();});
 loadCalendarStatus();
 async function loadBusinessSettings(){
- const r=await fetch("/api/business"); if(!r.ok)return; const b=await r.json();
+ const r=await fetch("/api/business",{credentials:"same-origin",cache:"no-store"}); if(!r.ok)return; const b=await r.json();
  document.getElementById("cfgName").value=b.business_name||""; document.getElementById("cfgSector").value=b.sector||"";
  document.getElementById("cfgHours").value=b.working_hours||""; document.getElementById("cfgAddress").value=b.address||"";
  document.getElementById("cfgClosed").value=(b.closed_days||[]).join(", "); document.getElementById("cfgTone").value=b.tone||"";
