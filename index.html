@@ -580,7 +580,7 @@ td{border-bottom-color:#222!important;color:#ddd!important}
 .nx-modal-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}.nx-modal-actions .nx-modal-wide{grid-column:1/-1}.nx-modal-actions button{min-height:44px}.nx-modal-note{font-size:10px;color:#777;line-height:1.5;margin-top:12px}
 .nx-create-status{min-height:18px;margin-top:9px;font-size:11px;color:#8d8d8d}.nx-create-status.ok{color:var(--tc-green)}.nx-create-status.err{color:#e58a8a}body.nx-modal-open{overflow:hidden}
 @media(max-width:560px){.nx-modal-backdrop{padding:10px;align-items:flex-end}.nx-modal{border-radius:22px 22px 18px 18px;max-height:88vh}.nx-detail-grid{grid-template-columns:1fr}.nx-detail-service{grid-column:auto}.nx-modal-title{font-size:20px}}
-</style></head>
+</style><style id="nx-table-link-css">.nx-table-link{padding:0!important;min-height:0!important;background:transparent!important;color:#f1d78e!important;border-radius:0!important;text-align:left;font-size:12px;font-weight:800}.nx-table-link:hover{text-decoration:underline}</style></head>
 <body><div id="authScreen" class="auth-shell">
 <div class="auth-glow auth-glow-one"></div><div class="auth-glow auth-glow-two"></div>
 <div class="auth-card">
@@ -869,7 +869,7 @@ function actionButtons(x){
  if(x.status==="confirmed")return '<div class="nx-row-actions"><button class="approve" onclick="setStatus(\''+id+'\',\'completed\')">✓ Tamamlandı</button><button class="cancel" onclick="setStatus(\''+id+'\',\'cancelled\')">✕ İptal</button></div>';
  return "";
 }
-function appointmentTable(items){if(!items.length)return '<div class="muted">Randevu bulunmuyor.</div>';return '<div class="scroll"><table><tr><th>Müşteri</th><th>Saat</th><th>Hizmet</th><th>Durum</th><th>İşlem</th></tr>'+items.map(x=>'<tr><td>'+escapeHtml(x.customer_name)+'</td><td>'+escapeHtml(x.time)+'</td><td>'+escapeHtml(x.service)+'</td><td>'+badge(x.status)+'</td><td>'+actionButtons(x)+'</td></tr>').join("")+"</table></div>";}
+function appointmentTable(items){if(!items.length)return '<div class="muted">Randevu bulunmuyor.</div>';return '<div class="scroll"><table><tr><th>Müşteri</th><th>Saat</th><th>Hizmet</th><th>Durum</th><th>İşlem</th></tr>'+items.map(x=>'<tr><td><button type="button" class="nx-table-link" onclick="nxOpenAppointmentDetail(\\''+escapeHtml(x.id)+'\\')">'+escapeHtml(x.customer_name)+'</button></td><td>'+escapeHtml(x.time)+'</td><td>'+escapeHtml(x.service)+'</td><td>'+badge(x.status)+'</td><td>'+actionButtons(x)+'</td></tr>').join("")+"</table></div>";}
 async function loadUsage(){
  const r=await fetch("/api/usage"); if(!r.ok)return;
  const u=await r.json(); const el=document.getElementById("usageInfo"); const el2=document.getElementById("nxUsageInfo"); if(!el&&!el2)return;
@@ -1075,7 +1075,7 @@ async function loadDashboard(){
 
 fetch("/api/business").then(r=>r.json()).then(b=>{const el=document.getElementById("business");if(el)el.textContent=b.business_name+" • "+b.sector+" • "+b.working_hours;}).catch(()=>{});
 
-document.getElementById("notifyBtn").addEventListener("click",enableNotifications);
+document.getElementById("nxNewAppt")?.addEventListener("click",()=>{nxSetPage("appointments");setTimeout(()=>{const el=document.getElementById("appointmentCreateCard");el?.scrollIntoView({behavior:"smooth",block:"center"});document.getElementById("customer_name")?.focus();},50);});document.getElementById("notifyBtn").addEventListener("click",enableNotifications);
 document.getElementById("nxModalClose")?.addEventListener("click",nxCloseAppointmentModal);
 document.getElementById("nxAppointmentModal")?.addEventListener("click",e=>{if(e.target.id==="nxAppointmentModal")nxCloseAppointmentModal();});
 nxInitAppointmentCenter(); nxInitCustomerTools();
