@@ -1101,7 +1101,26 @@ class Handler(BaseHTTPRequestHandler):
                 sub_status=str(info.get("subscriptionStatus","")).lower()
                 if not sub_ref:
                     self.send_json(502,{"error":"iyzico abonelik referansı alınamadı."}); return
-                database.create_or_update_subscription(user[1],"iyzico",customer_ref,sub_ref,"active" if sub_status=="active" else "pending")
+                # iyzico exposes the authoritative subscription dates on the detail endpoint.
+                # Persist them so Pro access ends with the paid period instead of becoming indefinite.
+                period_start = None
+                period_end = None
+                try:
+                    detail=iyzico_request("GET","/v2/subscription/subscriptions/"+sub_ref)
+                    if detail.get("status") == "success":
+                        items=((detail.get("data") or {}).get("items") or [])
+                        if items:
+                            item=items[0]
+                            period_start=item.get("startDate")
+                            period_end=item.get("endDate")
+                            sub_status=str(item.get("subscriptionStatus") or sub_status).lower()
+                except Exception as exc:
+                    print(f"IYZICO_SUBSCRIPTION_DETAIL_WARNING: {exc}", flush=True)
+                database.create_or_update_subscription(
+                    user[1],"iyzico",customer_ref,sub_ref,
+                    "active" if sub_status=="active" else "pending",
+                    period_start=period_start,period_end=period_end
+                )
                 database.complete_billing_checkout(token)
                 database.write_audit_log(user[1],user[0],"subscription_started","subscription",sub_ref,{"provider":"iyzico"})
                 self.send_json(200,{"success":True,"subscription":database.get_subscription_record(user[1])}); return
