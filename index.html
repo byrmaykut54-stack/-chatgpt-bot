@@ -997,6 +997,7 @@ async function loadDashboard(){
  const customers=cr.ok?await cr.json():[];
  const report=rr.ok?await rr.json():null;
  checkAppointmentNotifications(items);checkUpcomingReminders(items);
+ const setText=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=String(v??0);};
  const todayItems=items.filter(x=>x.date===today),pending=items.filter(x=>x.status==="pending"),confirmed=items.filter(x=>x.status==="confirmed");
  const requestRow=document.getElementById("nxRequestRow");
  if(requestRow){
@@ -1004,7 +1005,6 @@ async function loadDashboard(){
  }
  setText("nxApptTodayStat",todayItems.length); setText("nxApptPendingStat",pending.length); setText("nxApptConfirmedStat",confirmed.length); setText("nxApptViewStat",nxAppointmentView==="calendar"?"TAKVİM":"LİSTE");
  nxAppointmentCache=items; nxRenderAppointmentCenter(items);
- const setText=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=String(v??0);};
  if(report){setText("reportTotal",report.appointments_total);setText("reportCompleted",report.appointments_completed);setText("reportCancelled",report.appointments_cancelled);setText("reportTotalPage",report.appointments_total);setText("reportCompletedPage",report.appointments_completed);setText("reportPendingPage",report.appointments_pending);setText("reportCancelledPage",report.appointments_cancelled);setText("reportCustomersPage",report.customers_total);setText("reportMessagesPage",report.messages_total);}
 
  document.getElementById("todayCount").textContent=todayItems.length;
@@ -1154,6 +1154,7 @@ async function authInit(){
     loadSubscription();loadUsage();loadAudit();loadDashboard();loadMasterPanel();loadBusinessSettings();loadTeam();
   });
 }
+history.scrollRestoration="manual";
 function nxSetPage(page,writeHash=true){
  const savedScrollY=window.scrollY;
  const allowed=["dashboard","appointments","customers","messages","team","settings","subscription","usage","audit","reports"];
@@ -1169,7 +1170,7 @@ function nxSetPage(page,writeHash=true){
  window.scrollTo(0,savedScrollY);
  requestAnimationFrame(()=>window.scrollTo(0,savedScrollY));
 }
-document.querySelectorAll("#nexoraNav [data-page]").forEach(btn=>btn.addEventListener("click",()=>{nxSetPage(btn.dataset.page);nxCloseMenu();}));
+document.querySelectorAll("#nexoraNav [data-page]").forEach(btn=>btn.addEventListener("click",()=>{const y=window.scrollY;nxSetPage(btn.dataset.page);nxCloseMenu();btn.blur();window.scrollTo(0,y);requestAnimationFrame(()=>window.scrollTo(0,y));}));
 const nxMenuTrigger=document.getElementById("nxMenuTrigger"),nxMenuPanel=document.getElementById("nexoraNav");
 function nxOpenMenu(){nxMenuPanel.classList.add("is-open");nxMenuTrigger.setAttribute("aria-expanded","true");}
 function nxCloseMenu(){nxMenuPanel.classList.remove("is-open");nxMenuTrigger.setAttribute("aria-expanded","false");}
