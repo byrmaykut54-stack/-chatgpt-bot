@@ -1091,7 +1091,6 @@ def get_business_by_provider_subscription(provider_subscription_id):
     with connection() as conn:
         row=conn.execute("SELECT business_id FROM subscriptions WHERE provider_subscription_id=%s LIMIT 1",(str(provider_subscription_id or ""),)).fetchone()
     return row[0] if row else None
-",
 
 def list_users(business_id):
     with connection() as conn:
