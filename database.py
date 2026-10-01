@@ -1093,3 +1093,518 @@ def get_business_by_provider_subscription(provider_subscription_id):
     with connection() as conn:
         row=conn.execute("SELECT business_id FROM subscriptions WHERE provider_subscription_id=%s LIMIT 1",(str(provider_subscription_id or ""),)).fetchone()
     return row[0] if row else None
+",
+
+def list_users(business_id):
+    with connection() as conn:
+        return conn.execute("SELECT id,email,role,created_at FROM users WHERE business_id=%s ORDER BY created_at",(business_id,)).fetchall()
+
+def get_user_in_business(business_id, user_id):
+    with connection() as conn:
+        return conn.execute(
+            "SELECT id,email,role FROM users WHERE id=%s AND business_id=%s",
+            (user_id, business_id)
+        ).fetchone()
+
+def get_user_permissions(business_id, user_id):
+    with connection() as conn:
+        row=conn.execute("SELECT permissions FROM users WHERE id=%s AND business_id=%s",(user_id,business_id)).fetchone()
+        return row[0] if row and row[0] else {}
+
+def count_owners(business_id):
+    with connection() as conn:
+        return conn.execute(
+            "SELECT COUNT(*) FROM users WHERE business_id=%s AND role='owner'",
+            (business_id,)
+        ).fetchone()[0]
+
+def update_user_role(business_id,user_id,role):
+    with connection() as conn:
+        conn.execute("UPDATE users SET role=%s WHERE id=%s AND business_id=%s",(role,user_id,business_id))
+        conn.commit()
+
+
+def delete_account(user_id, business_id):
+    """Permanently delete the signed-in owner's account and entire business workspace atomically."""
+    with connection() as conn:
+        row=conn.execute(
+            "SELECT id,email,role FROM users WHERE id=%s AND business_id=%s FOR UPDATE",
+            (user_id,business_id)
+        ).fetchone()
+        if not row:
+            return None
+        if row[2] != "owner":
+            raise PermissionError("Sadece işletme sahibi hesabını silebilir.")
+        # businesses is the root record; dependent records use ON DELETE CASCADE.
+        conn.execute("DELETE FROM businesses WHERE id=%s", (business_id,))
+        conn.commit()
+        return {"id":row[0],"email":row[1]}
+
+def delete_user(business_id, user_id):
+    with connection() as conn:
+        row=conn.execute("DELETE FROM users WHERE id=%s AND business_id=%s RETURNING id",(user_id,business_id)).fetchone()
+        conn.commit()
+        return bool(row)
+
+def write_audit_log(business_id, user_id, action, target_type="", target_id="", details=None):
+    with connection() as conn:
+        conn.execute("INSERT INTO audit_logs (business_id,user_id,action,target_type,target_id,details) VALUES (%s,%s,%s,%s,%s,%s)",
+                     (business_id,user_id,action,target_type,str(target_id),psycopg.types.json.Json(details or {})))
+        conn.commit()
+
+def list_audit_logs(business_id, limit=100):
+    with connection() as conn:
+        return conn.execute("SELECT id,user_id,action,target_type,target_id,details,created_at FROM audit_logs WHERE business_id=%s ORDER BY created_at DESC LIMIT %s",(business_id,min(max(int(limit),1),200))).fetchall()
+
+def get_user_permissions(user_id):
+    with connection() as conn:
+        row=conn.execute("SELECT role, permissions FROM users WHERE id=%s",(user_id,)).fetchone()
+        if not row: return None
+        if row[0]=='owner': return {'appointments':True,'customers':True,'messages':True,'business_settings':True,'team':True,'reports':True}
+        return row[1] or {}
+
+def update_user_permissions(business_id,user_id,permissions):
+    with connection() as conn:
+        row=conn.execute("UPDATE users SET permissions=%s WHERE id=%s AND business_id=%s RETURNING id",(psycopg.types.json.Json(permissions),user_id,business_id)).fetchone()
+        conn.commit()
+        return bool(row)
+def create_google_oauth_state(state,business_id,user_id,expires_at):
+    with connection() as conn:
+        conn.execute("DELETE FROM google_oauth_states WHERE expires_at<NOW()")
+        conn.execute("INSERT INTO google_oauth_states (state,business_id,user_id,expires_at) VALUES (%s,%s,%s,%s)",(state,business_id,user_id,expires_at)); conn.commit()
+
+def consume_google_oauth_state(state):
+    with connection() as conn:
+        row=conn.execute("DELETE FROM google_oauth_states WHERE state=%s AND expires_at>NOW() RETURNING business_id,user_id",(state,)).fetchone(); conn.commit()
+    return {"business_id":row[0],"user_id":row[1]} if row else None
+
+def save_google_calendar_connection(business_id,user_id,calendar_id,calendar_name,access_token,refresh_token,expires_at,scopes):
+    with connection() as conn:
+        conn.execute("""INSERT INTO google_calendar_connections (business_id,user_id,calendar_id,calendar_name,access_token,refresh_token,access_token_expires_at,scopes) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
+        ON CONFLICT (business_id) DO UPDATE SET user_id=EXCLUDED.user_id,calendar_id=EXCLUDED.calendar_id,calendar_name=EXCLUDED.calendar_name,access_token=EXCLUDED.access_token,refresh_token=EXCLUDED.refresh_token,access_token_expires_at=EXCLUDED.access_token_expires_at,scopes=EXCLUDED.scopes,updated_at=NOW()""",(business_id,user_id,calendar_id,calendar_name,encrypt_secret(access_token),encrypt_secret(refresh_token),expires_at,scopes)); conn.commit()
+
+def get_google_calendar_connection(business_id):
+    with connection() as conn:
+        r=conn.execute("SELECT calendar_id,calendar_name,access_token,refresh_token,access_token_expires_at,scopes FROM google_calendar_connections WHERE business_id=%s",(business_id,)).fetchone()
+    if not r:return None
+    return {"calendar_id":r[0],"calendar_name":r[1],"access_token":decrypt_secret(r[2]),"refresh_token":decrypt_secret(r[3]),"access_token_expires_at":r[4].isoformat() if r[4] else None,"scopes":r[5]}
+
+def update_google_calendar_tokens(business_id,access_token,expires_at):
+    with connection() as conn:
+        conn.execute("UPDATE google_calendar_connections SET access_token=%s,access_token_expires_at=%s,updated_at=NOW() WHERE business_id=%s",(encrypt_secret(access_token),expires_at,business_id)); conn.commit()
+
+def delete_google_calendar_connection(business_id):
+    with connection() as conn:
+        conn.execute("DELETE FROM google_calendar_connections WHERE business_id=%s",(business_id,)); conn.commit()
+
+def save_google_event(appointment_id,business_id,event_id):
+    with connection() as conn:
+        conn.execute("INSERT INTO google_calendar_events (business_id,appointment_id,event_id) VALUES (%s,%s,%s) ON CONFLICT (business_id,appointment_id) DO UPDATE SET event_id=EXCLUDED.event_id,updated_at=NOW()",(business_id,appointment_id,event_id)); conn.commit()
+
+def get_google_event_id(appointment_id,business_id):
+    with connection() as conn:
+        r=conn.execute("SELECT event_id FROM google_calendar_events WHERE appointment_id=%s AND business_id=%s",(appointment_id,business_id)).fetchone()
+    return r[0] if r else None
+
+def delete_google_event(appointment_id,business_id):
+    with connection() as conn:
+        conn.execute("DELETE FROM google_calendar_events WHERE appointment_id=%s AND business_id=%s",(appointment_id,business_id,)); conn.commit()
+
+def get_usage(business_id, metric, period_start=None):
+    period_start = period_start or datetime.now(timezone.utc).date().replace(day=1)
+    with connection() as conn:
+        row=conn.execute(
+            "SELECT used_count FROM usage_counters WHERE business_id=%s AND period_start=%s AND metric=%s",
+            (business_id,period_start,metric)
+        ).fetchone()
+    return int(row[0]) if row else 0
+
+def increment_usage(business_id, metric, amount=1):
+    period_start=datetime.now(timezone.utc).date().replace(day=1)
+    with connection() as conn:
+        row=conn.execute(
+            "INSERT INTO usage_counters (business_id,period_start,metric,used_count) VALUES (%s,%s,%s,%s) "
+            "ON CONFLICT (business_id,period_start,metric) DO UPDATE SET used_count=usage_counters.used_count+EXCLUDED.used_count,updated_at=NOW() "
+            "RETURNING used_count",
+            (business_id,period_start,metric,amount)
+        ).fetchone()
+        conn.commit()
+    return int(row[0])
+
+def get_usage_summary(business_id):
+    return {
+        "appointments": get_usage(business_id,"appointments"),
+        "ai_messages": get_usage(business_id,"ai_messages")
+    }
+
+def get_business_subscription(business_id):
+    with connection() as conn:
+        row = conn.execute(
+            "SELECT plan,status,trial_ends_at FROM businesses WHERE id=%s",
+            (business_id,)
+        ).fetchone()
+    if not row:
+        return {"plan":"trial","status":"unknown","trial_ends_at":None,"trial_active":False}
+    trial_ends = row[2]
+    active = row[1] == "active" and (row[0] != "trial" or trial_ends is None or trial_ends > datetime.now(timezone.utc))
+    return {"plan":row[0],"status":row[1],"trial_ends_at":trial_ends.isoformat() if trial_ends else None,"trial_active":active}
+
+def get_subscription_record(business_id):
+    with connection() as conn:
+        row = conn.execute(
+            "SELECT id,provider,provider_customer_id,provider_subscription_id,plan,status,current_period_start,current_period_end,cancel_at_period_end FROM subscriptions WHERE business_id=%s",
+            (business_id,)
+        ).fetchone()
+    if not row:
+        return None
+    return {
+        "id": row[0], "provider": row[1], "provider_customer_id": row[2],
+        "provider_subscription_id": row[3], "plan": row[4], "status": row[5],
+        "current_period_start": row[6].isoformat() if row[6] else None,
+        "current_period_end": row[7].isoformat() if row[7] else None,
+        "cancel_at_period_end": bool(row[8])
+    }
+
+def create_billing_checkout_session(business_id, provider, checkout_token, conversation_id=""):
+    with connection() as conn:
+        row=conn.execute(
+            "INSERT INTO billing_checkout_sessions (business_id,provider,checkout_token,conversation_id) VALUES (%s,%s,%s,%s) RETURNING id",
+            (business_id,str(provider or ""),str(checkout_token or ""),str(conversation_id or ""))
+        ).fetchone()
+        conn.commit()
+        return row[0]
+
+def get_billing_checkout_session(checkout_token):
+    with connection() as conn:
+        return conn.execute(
+            "SELECT id,business_id,provider,checkout_token,conversation_id,created_at,completed_at FROM billing_checkout_sessions WHERE checkout_token=%s LIMIT 1",
+            (str(checkout_token or ""),)
+        ).fetchone()
+
+def complete_billing_checkout(checkout_token):
+    with connection() as conn:
+        conn.execute("UPDATE billing_checkout_sessions SET completed_at=NOW() WHERE checkout_token=%s AND completed_at IS NULL",(str(checkout_token or ""),))
+        conn.commit()
+
+def _parse_subscription_time(value):
+    if not value:
+        return None
+    if isinstance(value, datetime):
+        return value
+    try:
+        return datetime.fromisoformat(str(value).replace("Z","+00:00"))
+    except (TypeError, ValueError):
+        return None
+
+def create_or_update_subscription(business_id, provider, provider_customer_id, provider_subscription_id, status="pending", period_start=None, period_end=None, cancel_at_period_end=False):
+    status=str(status or "inactive").strip().lower()
+    plan="pro"
+    start=_parse_subscription_time(period_start)
+    end=_parse_subscription_time(period_end)
+    with connection() as conn:
+        row=conn.execute("""
+            INSERT INTO subscriptions
+              (business_id,provider,provider_customer_id,provider_subscription_id,plan,status,current_period_start,current_period_end,cancel_at_period_end)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            ON CONFLICT (business_id) DO UPDATE SET
+              provider=EXCLUDED.provider,
+              provider_customer_id=EXCLUDED.provider_customer_id,
+              provider_subscription_id=EXCLUDED.provider_subscription_id,
+              plan=EXCLUDED.plan,
+              status=EXCLUDED.status,
+              current_period_start=COALESCE(EXCLUDED.current_period_start,subscriptions.current_period_start),
+              current_period_end=COALESCE(EXCLUDED.current_period_end,subscriptions.current_period_end),
+              cancel_at_period_end=EXCLUDED.cancel_at_period_end,
+              updated_at=NOW()
+            RETURNING id
+        """,(business_id,str(provider or ""),str(provider_customer_id or ""),str(provider_subscription_id or ""),plan,status,start,end,bool(cancel_at_period_end))).fetchone()
+        business_status="active" if status in {"active","trialing"} else "inactive"
+        business_plan="pro" if status in {"active","trialing","past_due","unpaid"} else "trial"
+        conn.execute("UPDATE businesses SET plan=%s,status=%s WHERE id=%s",(business_plan,business_status,business_id))
+        conn.commit()
+        return row[0]
+
+def update_subscription_status(business_id,status,cancel_at_period_end=None,period_end=None):
+    status=str(status or "inactive").strip().lower()
+    with connection() as conn:
+        if cancel_at_period_end is None and period_end is None:
+            conn.execute("UPDATE subscriptions SET status=%s,updated_at=NOW() WHERE business_id=%s",(status,business_id))
+        else:
+            end=_parse_subscription_time(period_end)
+            conn.execute("UPDATE subscriptions SET status=%s,cancel_at_period_end=COALESCE(%s,cancel_at_period_end),current_period_end=COALESCE(%s,current_period_end),updated_at=NOW() WHERE business_id=%s",(status,cancel_at_period_end,end,business_id))
+        business_status="active" if status in {"active","trialing"} else "inactive"
+        business_plan="pro" if status in {"active","trialing","past_due","unpaid"} else "trial"
+        conn.execute("UPDATE businesses SET plan=%s,status=%s WHERE id=%s",(business_plan,business_status,business_id))
+        conn.commit()
+
+def get_business_by_provider_subscription(provider_subscription_id):
+    with connection() as conn:
+        row=conn.execute("SELECT business_id FROM subscriptions WHERE provider_subscription_id=%s LIMIT 1",(str(provider_subscription_id or ""),)).fetchone()
+    return row[0] if row else None
+ GROUP BY 1 ORDER BY COUNT(*) DESC, 1 LIMIT 1",
+            (business_id,)
+        ).fetchone()
+        total = appointments[0] or 0
+        completed = appointments[3] or 0
+        cancelled = appointments[4] or 0
+        return {
+            "appointments_total": total,
+            "appointments_pending": appointments[1],
+            "appointments_confirmed": appointments[2],
+            "appointments_completed": completed,
+            "appointments_cancelled": cancelled,
+            "customers_total": customers,
+            "messages_total": messages,
+            "completion_rate": round((completed / total) * 100, 1) if total else 0,
+            "cancellation_rate": round((cancelled / total) * 100, 1) if total else 0,
+            "peak_hour": (f"{hour_rows[0]:02d}:00" if hour_rows else None),
+            "top_service": (service_rows[0][0] if service_rows else None),
+            "service_distribution": [{"service": r[0], "count": r[1]} for r in service_rows]
+        }
+
+def list_users(business_id):
+    with connection() as conn:
+        return conn.execute("SELECT id,email,role,created_at FROM users WHERE business_id=%s ORDER BY created_at",(business_id,)).fetchall()
+
+def get_user_in_business(business_id, user_id):
+    with connection() as conn:
+        return conn.execute(
+            "SELECT id,email,role FROM users WHERE id=%s AND business_id=%s",
+            (user_id, business_id)
+        ).fetchone()
+
+def get_user_permissions(business_id, user_id):
+    with connection() as conn:
+        row=conn.execute("SELECT permissions FROM users WHERE id=%s AND business_id=%s",(user_id,business_id)).fetchone()
+        return row[0] if row and row[0] else {}
+
+def count_owners(business_id):
+    with connection() as conn:
+        return conn.execute(
+            "SELECT COUNT(*) FROM users WHERE business_id=%s AND role='owner'",
+            (business_id,)
+        ).fetchone()[0]
+
+def update_user_role(business_id,user_id,role):
+    with connection() as conn:
+        conn.execute("UPDATE users SET role=%s WHERE id=%s AND business_id=%s",(role,user_id,business_id))
+        conn.commit()
+
+
+def delete_account(user_id, business_id):
+    """Permanently delete the signed-in owner's account and entire business workspace atomically."""
+    with connection() as conn:
+        row=conn.execute(
+            "SELECT id,email,role FROM users WHERE id=%s AND business_id=%s FOR UPDATE",
+            (user_id,business_id)
+        ).fetchone()
+        if not row:
+            return None
+        if row[2] != "owner":
+            raise PermissionError("Sadece işletme sahibi hesabını silebilir.")
+        # businesses is the root record; dependent records use ON DELETE CASCADE.
+        conn.execute("DELETE FROM businesses WHERE id=%s", (business_id,))
+        conn.commit()
+        return {"id":row[0],"email":row[1]}
+
+def delete_user(business_id, user_id):
+    with connection() as conn:
+        row=conn.execute("DELETE FROM users WHERE id=%s AND business_id=%s RETURNING id",(user_id,business_id)).fetchone()
+        conn.commit()
+        return bool(row)
+
+def write_audit_log(business_id, user_id, action, target_type="", target_id="", details=None):
+    with connection() as conn:
+        conn.execute("INSERT INTO audit_logs (business_id,user_id,action,target_type,target_id,details) VALUES (%s,%s,%s,%s,%s,%s)",
+                     (business_id,user_id,action,target_type,str(target_id),psycopg.types.json.Json(details or {})))
+        conn.commit()
+
+def list_audit_logs(business_id, limit=100):
+    with connection() as conn:
+        return conn.execute("SELECT id,user_id,action,target_type,target_id,details,created_at FROM audit_logs WHERE business_id=%s ORDER BY created_at DESC LIMIT %s",(business_id,min(max(int(limit),1),200))).fetchall()
+
+def get_user_permissions(user_id):
+    with connection() as conn:
+        row=conn.execute("SELECT role, permissions FROM users WHERE id=%s",(user_id,)).fetchone()
+        if not row: return None
+        if row[0]=='owner': return {'appointments':True,'customers':True,'messages':True,'business_settings':True,'team':True,'reports':True}
+        return row[1] or {}
+
+def update_user_permissions(business_id,user_id,permissions):
+    with connection() as conn:
+        row=conn.execute("UPDATE users SET permissions=%s WHERE id=%s AND business_id=%s RETURNING id",(psycopg.types.json.Json(permissions),user_id,business_id)).fetchone()
+        conn.commit()
+        return bool(row)
+def create_google_oauth_state(state,business_id,user_id,expires_at):
+    with connection() as conn:
+        conn.execute("DELETE FROM google_oauth_states WHERE expires_at<NOW()")
+        conn.execute("INSERT INTO google_oauth_states (state,business_id,user_id,expires_at) VALUES (%s,%s,%s,%s)",(state,business_id,user_id,expires_at)); conn.commit()
+
+def consume_google_oauth_state(state):
+    with connection() as conn:
+        row=conn.execute("DELETE FROM google_oauth_states WHERE state=%s AND expires_at>NOW() RETURNING business_id,user_id",(state,)).fetchone(); conn.commit()
+    return {"business_id":row[0],"user_id":row[1]} if row else None
+
+def save_google_calendar_connection(business_id,user_id,calendar_id,calendar_name,access_token,refresh_token,expires_at,scopes):
+    with connection() as conn:
+        conn.execute("""INSERT INTO google_calendar_connections (business_id,user_id,calendar_id,calendar_name,access_token,refresh_token,access_token_expires_at,scopes) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
+        ON CONFLICT (business_id) DO UPDATE SET user_id=EXCLUDED.user_id,calendar_id=EXCLUDED.calendar_id,calendar_name=EXCLUDED.calendar_name,access_token=EXCLUDED.access_token,refresh_token=EXCLUDED.refresh_token,access_token_expires_at=EXCLUDED.access_token_expires_at,scopes=EXCLUDED.scopes,updated_at=NOW()""",(business_id,user_id,calendar_id,calendar_name,encrypt_secret(access_token),encrypt_secret(refresh_token),expires_at,scopes)); conn.commit()
+
+def get_google_calendar_connection(business_id):
+    with connection() as conn:
+        r=conn.execute("SELECT calendar_id,calendar_name,access_token,refresh_token,access_token_expires_at,scopes FROM google_calendar_connections WHERE business_id=%s",(business_id,)).fetchone()
+    if not r:return None
+    return {"calendar_id":r[0],"calendar_name":r[1],"access_token":decrypt_secret(r[2]),"refresh_token":decrypt_secret(r[3]),"access_token_expires_at":r[4].isoformat() if r[4] else None,"scopes":r[5]}
+
+def update_google_calendar_tokens(business_id,access_token,expires_at):
+    with connection() as conn:
+        conn.execute("UPDATE google_calendar_connections SET access_token=%s,access_token_expires_at=%s,updated_at=NOW() WHERE business_id=%s",(encrypt_secret(access_token),expires_at,business_id)); conn.commit()
+
+def delete_google_calendar_connection(business_id):
+    with connection() as conn:
+        conn.execute("DELETE FROM google_calendar_connections WHERE business_id=%s",(business_id,)); conn.commit()
+
+def save_google_event(appointment_id,business_id,event_id):
+    with connection() as conn:
+        conn.execute("INSERT INTO google_calendar_events (business_id,appointment_id,event_id) VALUES (%s,%s,%s) ON CONFLICT (business_id,appointment_id) DO UPDATE SET event_id=EXCLUDED.event_id,updated_at=NOW()",(business_id,appointment_id,event_id)); conn.commit()
+
+def get_google_event_id(appointment_id,business_id):
+    with connection() as conn:
+        r=conn.execute("SELECT event_id FROM google_calendar_events WHERE appointment_id=%s AND business_id=%s",(appointment_id,business_id)).fetchone()
+    return r[0] if r else None
+
+def delete_google_event(appointment_id,business_id):
+    with connection() as conn:
+        conn.execute("DELETE FROM google_calendar_events WHERE appointment_id=%s AND business_id=%s",(appointment_id,business_id,)); conn.commit()
+
+def get_usage(business_id, metric, period_start=None):
+    period_start = period_start or datetime.now(timezone.utc).date().replace(day=1)
+    with connection() as conn:
+        row=conn.execute(
+            "SELECT used_count FROM usage_counters WHERE business_id=%s AND period_start=%s AND metric=%s",
+            (business_id,period_start,metric)
+        ).fetchone()
+    return int(row[0]) if row else 0
+
+def increment_usage(business_id, metric, amount=1):
+    period_start=datetime.now(timezone.utc).date().replace(day=1)
+    with connection() as conn:
+        row=conn.execute(
+            "INSERT INTO usage_counters (business_id,period_start,metric,used_count) VALUES (%s,%s,%s,%s) "
+            "ON CONFLICT (business_id,period_start,metric) DO UPDATE SET used_count=usage_counters.used_count+EXCLUDED.used_count,updated_at=NOW() "
+            "RETURNING used_count",
+            (business_id,period_start,metric,amount)
+        ).fetchone()
+        conn.commit()
+    return int(row[0])
+
+def get_usage_summary(business_id):
+    return {
+        "appointments": get_usage(business_id,"appointments"),
+        "ai_messages": get_usage(business_id,"ai_messages")
+    }
+
+def get_business_subscription(business_id):
+    with connection() as conn:
+        row = conn.execute(
+            "SELECT plan,status,trial_ends_at FROM businesses WHERE id=%s",
+            (business_id,)
+        ).fetchone()
+    if not row:
+        return {"plan":"trial","status":"unknown","trial_ends_at":None,"trial_active":False}
+    trial_ends = row[2]
+    active = row[1] == "active" and (row[0] != "trial" or trial_ends is None or trial_ends > datetime.now(timezone.utc))
+    return {"plan":row[0],"status":row[1],"trial_ends_at":trial_ends.isoformat() if trial_ends else None,"trial_active":active}
+
+def get_subscription_record(business_id):
+    with connection() as conn:
+        row = conn.execute(
+            "SELECT id,provider,provider_customer_id,provider_subscription_id,plan,status,current_period_start,current_period_end,cancel_at_period_end FROM subscriptions WHERE business_id=%s",
+            (business_id,)
+        ).fetchone()
+    if not row:
+        return None
+    return {
+        "id": row[0], "provider": row[1], "provider_customer_id": row[2],
+        "provider_subscription_id": row[3], "plan": row[4], "status": row[5],
+        "current_period_start": row[6].isoformat() if row[6] else None,
+        "current_period_end": row[7].isoformat() if row[7] else None,
+        "cancel_at_period_end": bool(row[8])
+    }
+
+def create_billing_checkout_session(business_id, provider, checkout_token, conversation_id=""):
+    with connection() as conn:
+        row=conn.execute(
+            "INSERT INTO billing_checkout_sessions (business_id,provider,checkout_token,conversation_id) VALUES (%s,%s,%s,%s) RETURNING id",
+            (business_id,str(provider or ""),str(checkout_token or ""),str(conversation_id or ""))
+        ).fetchone()
+        conn.commit()
+        return row[0]
+
+def get_billing_checkout_session(checkout_token):
+    with connection() as conn:
+        return conn.execute(
+            "SELECT id,business_id,provider,checkout_token,conversation_id,created_at,completed_at FROM billing_checkout_sessions WHERE checkout_token=%s LIMIT 1",
+            (str(checkout_token or ""),)
+        ).fetchone()
+
+def complete_billing_checkout(checkout_token):
+    with connection() as conn:
+        conn.execute("UPDATE billing_checkout_sessions SET completed_at=NOW() WHERE checkout_token=%s AND completed_at IS NULL",(str(checkout_token or ""),))
+        conn.commit()
+
+def _parse_subscription_time(value):
+    if not value:
+        return None
+    if isinstance(value, datetime):
+        return value
+    try:
+        return datetime.fromisoformat(str(value).replace("Z","+00:00"))
+    except (TypeError, ValueError):
+        return None
+
+def create_or_update_subscription(business_id, provider, provider_customer_id, provider_subscription_id, status="pending", period_start=None, period_end=None, cancel_at_period_end=False):
+    status=str(status or "inactive").strip().lower()
+    plan="pro"
+    start=_parse_subscription_time(period_start)
+    end=_parse_subscription_time(period_end)
+    with connection() as conn:
+        row=conn.execute("""
+            INSERT INTO subscriptions
+              (business_id,provider,provider_customer_id,provider_subscription_id,plan,status,current_period_start,current_period_end,cancel_at_period_end)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            ON CONFLICT (business_id) DO UPDATE SET
+              provider=EXCLUDED.provider,
+              provider_customer_id=EXCLUDED.provider_customer_id,
+              provider_subscription_id=EXCLUDED.provider_subscription_id,
+              plan=EXCLUDED.plan,
+              status=EXCLUDED.status,
+              current_period_start=COALESCE(EXCLUDED.current_period_start,subscriptions.current_period_start),
+              current_period_end=COALESCE(EXCLUDED.current_period_end,subscriptions.current_period_end),
+              cancel_at_period_end=EXCLUDED.cancel_at_period_end,
+              updated_at=NOW()
+            RETURNING id
+        """,(business_id,str(provider or ""),str(provider_customer_id or ""),str(provider_subscription_id or ""),plan,status,start,end,bool(cancel_at_period_end))).fetchone()
+        business_status="active" if status in {"active","trialing"} else "inactive"
+        business_plan="pro" if status in {"active","trialing","past_due","unpaid"} else "trial"
+        conn.execute("UPDATE businesses SET plan=%s,status=%s WHERE id=%s",(business_plan,business_status,business_id))
+        conn.commit()
+        return row[0]
+
+def update_subscription_status(business_id,status,cancel_at_period_end=None,period_end=None):
+    status=str(status or "inactive").strip().lower()
+    with connection() as conn:
+        if cancel_at_period_end is None and period_end is None:
+            conn.execute("UPDATE subscriptions SET status=%s,updated_at=NOW() WHERE business_id=%s",(status,business_id))
+        else:
+            end=_parse_subscription_time(period_end)
+            conn.execute("UPDATE subscriptions SET status=%s,cancel_at_period_end=COALESCE(%s,cancel_at_period_end),current_period_end=COALESCE(%s,current_period_end),updated_at=NOW() WHERE business_id=%s",(status,cancel_at_period_end,end,business_id))
+        business_status="active" if status in {"active","trialing"} else "inactive"
+        business_plan="pro" if status in {"active","trialing","past_due","unpaid"} else "trial"
+        conn.execute("UPDATE businesses SET plan=%s,status=%s WHERE id=%s",(business_plan,business_status,business_id))
+        conn.commit()
+
+def get_business_by_provider_subscription(provider_subscription_id):
+    with connection() as conn:
+        row=conn.execute("SELECT business_id FROM subscriptions WHERE provider_subscription_id=%s LIMIT 1",(str(provider_subscription_id or ""),)).fetchone()
+    return row[0] if row else None
