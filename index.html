@@ -194,6 +194,84 @@ linear-gradient(135deg,#0a111f 0%,#172235 58%,#202d40 100%);color:#fff;box-shado
 /* NEXORA billing, usage & audit premium */
 .nx-billing-hero,.nx-usage-hero,.nx-audit-hero{display:flex;justify-content:space-between;align-items:flex-end;gap:18px;padding:27px 29px;margin-bottom:16px;border-radius:23px;background:linear-gradient(135deg,#0a111f,#1a2638);color:#fff;box-shadow:0 22px 52px rgba(10,17,31,.15)}.nx-billing-hero h3,.nx-usage-hero h3,.nx-audit-hero h3{font-size:28px;letter-spacing:-.045em;margin:0 0 7px}.nx-billing-hero h3 span{color:#d7bd7d}.nx-billing-hero p,.nx-usage-hero p,.nx-audit-hero p{margin:0;color:#adb7c6;font-size:12px}.nx-billing-badge,.nx-usage-badge,.nx-audit-badge{font-size:9px;font-weight:850;letter-spacing:.14em;color:#d7bd7d;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:999px;padding:8px 11px;white-space:nowrap}.nx-plan-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.nx-plan-card{padding:23px}.nx-plan-top{display:flex;justify-content:space-between;align-items:center;font-size:9px;letter-spacing:.14em;font-weight:850;color:#8b95a3}.nx-plan-top b{color:#9a7b35;background:#f5edda;border-radius:999px;padding:6px 9px}.nx-plan-card h4{font-size:23px;margin:18px 0 5px}.nx-plan-card p{font-size:11px;color:#89919d;min-height:34px}.nx-plan-card ul{list-style:none;padding:0;margin:18px 0 0;border-top:1px solid #edf0f2}.nx-plan-card li{padding:10px 0;border-bottom:1px solid #edf0f2;font-size:11px;color:#4d5968}.nx-plan-card li:before{content:"✓";color:#a07d1f;font-weight:800;margin-right:8px}.nx-plan-pro{border-color:rgba(184,149,74,.25);box-shadow:0 18px 42px rgba(15,23,42,.08)}.nx-billing-status{margin-top:16px;padding:19px 21px;display:flex;justify-content:space-between;align-items:center}.nx-billing-kicker,.nx-usage-head span,.nx-audit-head span{display:block;font-size:9px;font-weight:850;letter-spacing:.16em;color:#9a7b35}.nx-billing-status strong{display:block;font-size:21px;margin:4px 0}.nx-billing-status .primary{min-width:150px}.nx-usage-card,.nx-audit-card{padding:22px}.nx-usage-head,.nx-audit-head{display:flex;justify-content:space-between;align-items:center}.nx-usage-head h4,.nx-audit-head h4{font-size:20px;margin:4px 0}.nx-usage-dot{font-size:9px;color:#18733d;background:#edf8f1;border-radius:999px;padding:7px 9px;font-weight:850}.nx-usage-info{margin-top:18px;font-size:12px;line-height:2}.nx-audit-shield{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;background:#f5edda}.nx-audit-list{margin-top:15px}.nx-audit-list>div{padding:12px 2px!important;border-bottom:1px solid #edf0f2!important;font-size:11px}.nx-audit-list b{font-size:12px}.nx-audit-list .muted{font-size:10px}
 @media(max-width:700px){.nx-billing-hero,.nx-usage-hero,.nx-audit-hero{display:block;padding:23px;border-radius:20px}.nx-billing-badge,.nx-usage-badge,.nx-audit-badge{display:inline-block;margin-top:14px}.nx-plan-grid{grid-template-columns:1fr}.nx-billing-status{display:block}.nx-billing-status .primary{width:100%;margin-top:13px}}
+
+/* NEXORA BLACK — production premium dark system */
+:root{
+ --nx-black:#07090d;--nx-black-2:#0b0f16;--nx-surface:#10151d;--nx-surface-2:#141a23;
+ --nx-surface-3:#1a212c;--nx-line:rgba(255,255,255,.085);--nx-line-strong:rgba(255,255,255,.13);
+ --nx-text:#f5f7fa;--nx-muted:#8e98a8;--nx-gold:#c7a45a;--nx-gold-soft:#2b2415;
+ --nx-green:#57c58b;--nx-red:#e77979;--nx-yellow:#d9b85f;
+}
+html,body{background:var(--nx-black)!important;color:var(--nx-text)!important}
+body{background:
+ radial-gradient(900px 500px at 8% -12%,rgba(199,164,90,.08),transparent 55%),
+ radial-gradient(800px 420px at 100% 0%,rgba(62,86,120,.12),transparent 55%),
+ var(--nx-black)!important}
+.wrap{max-width:1440px;padding:22px 26px}
+.top{background:rgba(12,16,23,.82)!important;border-color:var(--nx-line)!important;box-shadow:0 20px 55px rgba(0,0,0,.28)!important;color:var(--nx-text)}
+.top h1,.nx-page-head h2,.card h2,.stat{color:var(--nx-text)!important}
+.muted,.nx-page-head span,.nx-hero-note,.nx-appt-topline p,.nx-crm-head p{color:var(--nx-muted)!important}
+.card,.master-panel,.master-panel,.nx-master,.nx-appt-topline,.nx-crm-head,.nx-crm-list .nx-customer,.plan,
+.nx-appt-stats>div,.nx-settings-nav,.nx-team-create,.nx-team-manage,.nx-profile,.nx-detail,.nx-set-section,
+.auth-form-panel{
+ background:linear-gradient(145deg,rgba(18,23,31,.96),rgba(13,18,25,.96))!important;
+ border-color:var(--nx-line)!important;color:var(--nx-text)!important;
+ box-shadow:0 16px 45px rgba(0,0,0,.22)!important}
+.card:hover{border-color:rgba(199,164,90,.28)!important;box-shadow:0 22px 52px rgba(0,0,0,.28)!important}
+.label,.nx-appt-stats span,.nx-create-head span,.nx-hero-kicker,.auth-eyebrow,.auth-tag{color:var(--nx-gold)!important}
+button{color:var(--nx-text)}
+.primary,.install{background:linear-gradient(135deg,#c7a45a,#a8843f)!important;color:#090b0f!important;box-shadow:0 10px 25px rgba(199,164,90,.16)!important}
+.primary:hover,.install:hover{background:linear-gradient(135deg,#d5b76f,#b18e49)!important}
+input,select,textarea{background:#0b1017!important;color:var(--nx-text)!important;border-color:var(--nx-line-strong)!important}
+input::placeholder,textarea::placeholder{color:#697486!important}
+input:focus,select:focus,textarea:focus{border-color:rgba(199,164,90,.7)!important;box-shadow:0 0 0 4px rgba(199,164,90,.10)!important}
+table th{color:#7f8999!important;border-color:var(--nx-line)!important}
+table td{color:#dbe0e8!important;border-color:var(--nx-line)!important}
+.badge.pending{background:#332a16!important;color:#e4c66f!important}
+.badge.confirmed{background:#102c20!important;color:#70d39e!important}
+.badge.cancelled{background:#32191b!important;color:#ed8b8b!important}
+.approve{background:#102c20!important;color:#70d39e!important}.cancel{background:#32191b!important;color:#ed8b8b!important}
+.nx-nav{background:rgba(7,10,14,.92)!important;border-color:var(--nx-line)!important;box-shadow:0 16px 38px rgba(0,0,0,.35)!important}
+.nx-nav button{color:#8e98a8!important}.nx-nav button:hover{background:#171d26!important;color:#fff!important}
+.nx-nav button.active{background:linear-gradient(135deg,#f3f5f7,#dfe4e9)!important;color:#0a0d12!important}
+.nx-menu-trigger{background:linear-gradient(135deg,#0b1018,#171e29)!important;border-color:var(--nx-line)!important}
+.nx-menu-panel{background:rgba(15,20,28,.98)!important;border-color:var(--nx-line-strong)!important}
+.nx-menu-panel button{color:#cdd4de!important}.nx-menu-panel button:hover{background:#1a212b!important;color:#fff!important}
+.nx-menu-panel button.active{background:linear-gradient(135deg,#c7a45a,#a8843f)!important;color:#090b0f!important}
+.nx-dashboard-hero{background:
+ radial-gradient(circle at 82% 18%,rgba(199,164,90,.16),transparent 28%),
+ linear-gradient(135deg,#070a0f,#101722 58%,#172131)!important;
+ border:1px solid var(--nx-line)!important;box-shadow:0 28px 65px rgba(0,0,0,.36)!important}
+.nx-hero-copy p,.nx-ai-head p{color:#aeb8c7!important}
+.nx-live{background:rgba(255,255,255,.055)!important;border-color:var(--nx-line)!important}
+.nx-hero-secondary{background:rgba(255,255,255,.055)!important;border-color:var(--nx-line-strong)!important}
+.nx-appt-views button{background:#171d26!important;color:#9ba5b4!important}.nx-appt-views button.active{background:#f1f3f5!important;color:#090b0f!important}
+.nx-appt-toolbar,.nx-appt-topline,.nx-crm-toolbar{color:var(--nx-text)}
+.nx-ai-head{background:linear-gradient(135deg,#070a0f,#141c29)!important;border:1px solid var(--nx-line)!important}
+.nx-chat-list,.chat{background:#0b1017!important;border-color:var(--nx-line)!important}
+.nx-chat-item.active,.nx-chat-item:hover{background:#1d2028!important}
+.nx-msg.ai,.bot{background:#10251b!important;color:#d7f2e2!important}
+.nx-msg.user,.user{background:#181f29!important;color:#e5e9ef!important}
+.nx-avatar{background:linear-gradient(145deg,#302713,#1e1910)!important;color:#d8b969!important}
+.pill{background:#1c232d!important;color:#aab4c3!important}
+.nexora-corp,.nexora-copyright,.auth-foot,.auth-safe{color:#6f7989!important}
+.auth-shell{background:#05070a!important;color:var(--nx-text)!important}
+.auth-shell:before{background:
+ radial-gradient(circle at 50% -5%,rgba(199,164,90,.12),transparent 34%),
+ radial-gradient(circle at 10% 90%,rgba(51,73,105,.12),transparent 35%),
+ #05070a!important}
+.auth-card{background:rgba(13,17,24,.88)!important;border-color:var(--nx-line-strong)!important;box-shadow:0 40px 110px rgba(0,0,0,.55)!important}
+.auth-name,.auth-copy h1,.auth-label{color:#f5f7fa!important}
+.auth-subtitle{color:#929cac!important}
+.auth-card input{background:#080d13!important;color:#f5f7fa!important;border-color:var(--nx-line-strong)!important}
+.auth-secondary{background:#111720!important;color:#dce2ea!important;border-color:var(--nx-line-strong)!important}
+.auth-divider{color:#667183!important}.auth-divider:before,.auth-divider:after{background:var(--nx-line)!important}
+.trial-note{background:#2b2415!important;color:#d9bd72!important;border-color:#574722!important}
+.nexora-corp-line{background:linear-gradient(90deg,transparent,#39414d)!important}
+.nexora-corp-line:last-child{background:linear-gradient(90deg,#39414d,transparent)!important}
+.nx-dashboard-hero + .grid .card{background:linear-gradient(145deg,#121821,#0e131a)!important}
+.nx-health{color:#aeb8c7}
+@media(max-width:800px){.wrap{padding:13px}.top{border-radius:18px}.card{border-radius:17px}.nx-dashboard-hero{border-radius:20px}}
 </style>
 
 <style id="nx-navigation-css">.nx-page{display:block}.nx-hidden{display:none!important}</style><style id="nx-calendar-css">.nx-calbar{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:12px}.nx-calbar .group{display:flex;gap:6px;align-items:center}.nx-calbar button{background:#f5f7f9;color:#344054}.nx-calbar button.active{background:#111827;color:#fff}.nx-filter{display:grid;grid-template-columns:1.2fr 1fr 1fr auto;gap:8px;margin-bottom:12px}.nx-filter input,.nx-filter select{margin:0}.nx-daygrid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}.nx-day{min-height:110px;border:1px solid #e8ebef;border-radius:12px;padding:8px;background:#fff}.nx-day.muted{background:#fafbfc}.nx-day.today{border-color:#b7a16a;box-shadow:inset 0 0 0 1px #b7a16a}.nx-dayhead{font-size:11px;font-weight:850;margin-bottom:7px;display:flex;justify-content:space-between}.nx-appt{font-size:10px;padding:6px 7px;border-radius:8px;background:#f0f8f3;margin:4px 0;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.nx-appt.pending{background:#fff7df}.nx-appt.cancelled{background:#fdebea;text-decoration:line-through}.nx-list-actions{display:flex;gap:5px;flex-wrap:wrap}.nx-list-actions button{font-size:10px;padding:6px 8px}.nx-detail{padding:14px;border:1px solid #e7eaee;border-radius:14px;background:#fafbfc;margin-top:10px}.nx-empty{padding:20px;text-align:center;color:#8a929d;border:1px dashed #dfe4e8;border-radius:12px}@media(max-width:700px){.nx-filter{grid-template-columns:1fr 1fr}.nx-daygrid{grid-template-columns:repeat(2,1fr)}.nx-day{min-height:90px}.nx-day:nth-child(n+7){display:none}.nx-calbar{align-items:stretch}.nx-calbar .group{width:100%}.nx-calbar .group button{flex:1}}</style>
