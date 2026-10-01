@@ -563,7 +563,11 @@ td{border-bottom-color:#222!important;color:#ddd!important}
 .nx-report-hero{display:flex;justify-content:space-between;align-items:center;gap:20px;padding:25px 28px;margin-bottom:14px;border-radius:22px;background:linear-gradient(135deg,#fff,#f8fafc);border:1px solid rgba(15,23,42,.07);box-shadow:0 14px 38px rgba(15,23,42,.05)}.nx-report-hero h3{font-size:27px;letter-spacing:-.04em;margin:0 0 6px}.nx-report-hero h3 span{color:#9a7b35}.nx-report-hero p{margin:0;color:#7b8491;font-size:12px}.nx-report-badge{padding:8px 11px;border-radius:999px;background:#eaf7ef;color:#18733d;font-size:9px;font-weight:850;letter-spacing:.13em}.nx-report-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}.nx-report-card{padding:17px}.nx-report-card span{display:block;font-size:9px;font-weight:850;letter-spacing:.13em;color:#9a7b35}.nx-report-card strong{display:block;font-size:30px;margin-top:7px;letter-spacing:-.045em}.nx-report-card small{color:#8a929d;font-size:10px}.nx-report-detail{min-height:180px}.nx-report-big{display:inline-flex;flex-direction:column;margin:8px 30px 0 0}.nx-report-big strong{font-size:30px;letter-spacing:-.045em}.nx-report-big span{font-size:10px;color:#8a929d}.nx-report-advice{padding:14px;border-radius:13px;background:#f8f4e9;color:#5f6670;font-size:11px;line-height:1.65;margin-bottom:13px}
 @media(max-width:1000px){.nx-kpi-grid{grid-template-columns:repeat(3,1fr)}.nx-quick-grid{grid-template-columns:repeat(2,1fr)}.nx-dashboard-columns,.nx-secondary-columns{grid-template-columns:1fr}}
 @media(max-width:700px){.nx-command-hero{grid-template-columns:1fr;padding:22px 20px;border-radius:20px}.nx-command-copy h3{font-size:27px}.nx-command-copy p{font-size:12px}.nx-command-status{align-items:flex-start;text-align:left;margin-top:5px}.nx-kpi-grid{grid-template-columns:1fr 1fr;gap:8px}.nx-kpi{min-height:101px;padding:13px}.nx-kpi strong{font-size:25px}.nx-quick-grid{grid-template-columns:1fr}.nx-dashboard-columns{gap:10px}.nx-panel-head h3{font-size:16px}.nx-insight-grid{grid-template-columns:1fr 1fr}.nx-report-hero{display:block;padding:20px;border-radius:20px}.nx-report-badge{display:inline-block;margin-top:14px}.nx-report-grid{grid-template-columns:1fr 1fr}.nx-report-card strong{font-size:25px}}
-</style></head>
+</style>
+<style>
+.nx-row-actions{display:flex;gap:6px;flex-wrap:wrap}.nx-row-actions button{min-height:36px;padding:8px 10px;font-size:11px}@media(max-width:800px){.nx-row-actions{display:grid;grid-template-columns:1fr 1fr}.nx-row-actions button{width:100%}}
+</style>
+</head>
 <body><div id="authScreen" class="auth-shell">
 <div class="auth-glow auth-glow-one"></div><div class="auth-glow auth-glow-two"></div>
 <div class="auth-card">
@@ -836,8 +840,22 @@ const today=localDateISO();
 document.getElementById("todayLabel").textContent=new Date().toLocaleDateString("tr-TR",{weekday:"long",year:"numeric",month:"long",day:"numeric"});
 function escapeHtml(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[c]));}
 function badge(status){const l={pending:"Bekliyor",confirmed:"Onaylandı",cancelled:"İptal",completed:"Tamamlandı"}[status]||status;return '<span class="badge '+escapeHtml(status)+'">'+escapeHtml(l)+"</span>";}
-async function setStatus(id,status){const r=await fetch("/api/appointments/status",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id,status})});if(!r.ok){const x=await r.json().catch(()=>({}));alert(x.error||"Durum güncellenemedi.");return}if(status==="confirmed"&&"Notification" in window&&Notification.permission==="granted"){try{new Notification("Randevu onaylandı",{body:"Randevu durumu onaylandı."});}catch(e){}}loadDashboard();}
-function actionButtons(x){return x.status==="pending"?'<button class="approve" onclick="setStatus(\''+escapeHtml(x.id)+'\',\'confirmed\')">✓ Onayla</button><button class="cancel" onclick="setStatus(\''+escapeHtml(x.id)+'\',\'cancelled\')">✕ İptal</button>':"";}
+async function setStatus(id,status){
+ const r=await fetch("/api/appointments/status",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({id,status})});
+ if(!r.ok){const x=await r.json().catch(()=>({}));alert(x.error||"Durum güncellenemedi.");return}
+ const labels={confirmed:"Randevu onaylandı",cancelled:"Randevu iptal edildi",completed:"Randevu tamamlandı"};
+ if("Notification" in window){
+   if(Notification.permission==="default")try{await Notification.requestPermission();}catch(e){}
+   if(Notification.permission==="granted"&&labels[status])try{new Notification(labels[status],{body:"NEXORA randevu durumu güncellendi."});}catch(e){}
+ }
+ loadDashboard();
+}
+function actionButtons(x){
+ const id=escapeHtml(x.id);
+ if(x.status==="pending")return '<div class="nx-row-actions"><button class="approve" onclick="setStatus(\''+id+'\',\'confirmed\')">✓ Onayla</button><button class="cancel" onclick="setStatus(\''+id+'\',\'cancelled\')">✕ İptal</button></div>';
+ if(x.status==="confirmed")return '<div class="nx-row-actions"><button class="approve" onclick="setStatus(\''+id+'\',\'completed\')">✓ Tamamlandı</button><button class="cancel" onclick="setStatus(\''+id+'\',\'cancelled\')">✕ İptal</button></div>';
+ return "";
+}
 function appointmentTable(items){if(!items.length)return '<div class="muted">Randevu bulunmuyor.</div>';return '<div class="scroll"><table><tr><th>Müşteri</th><th>Saat</th><th>Hizmet</th><th>Durum</th><th>İşlem</th></tr>'+items.map(x=>'<tr><td>'+escapeHtml(x.customer_name)+'</td><td>'+escapeHtml(x.time)+'</td><td>'+escapeHtml(x.service)+'</td><td>'+badge(x.status)+'</td><td>'+actionButtons(x)+'</td></tr>').join("")+"</table></div>";}
 async function loadUsage(){
  const r=await fetch("/api/usage"); if(!r.ok)return;
