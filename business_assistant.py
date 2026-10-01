@@ -1088,6 +1088,10 @@ class Handler(BaseHTTPRequestHandler):
                 session=database.get_billing_checkout_session(token)
                 if not token or not session or session[1] != user[1]:
                     self.send_json(404,{"error":"Ödeme oturumu bulunamadı."}); return
+                # A callback can be retried by the browser/provider. Once the checkout
+                # session is completed, do not query iyzico or create a second audit event.
+                if session[6] is not None:
+                    self.send_json(200,{"success":True,"already_completed":True,"subscription":database.get_subscription_record(user[1])}); return
                 result=iyzico_request("GET","/v2/subscription/checkoutform/"+token)
                 if result.get("status") != "success":
                     self.send_json(502,{"error":result.get("errorMessage","Ödeme sonucu alınamadı."),"provider_response":result}); return
