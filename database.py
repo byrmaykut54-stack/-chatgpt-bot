@@ -578,8 +578,26 @@ def get_business_report(business_id):
             (business_id,)
         ).fetchall()
         hour_rows = conn.execute(
-            "SELECT split_part(time, ':', 1)::int AS hour, COUNT(*) FROM appointments WHERE business_id=%s AND length(time)=5 AND substring(time,3,1)=':'",
-
+            "SELECT split_part(time, ':', 1)::int AS hour, COUNT(*) FROM appointments WHERE business_id=%s AND length(time)=5 AND substring(time,3,1)=':' GROUP BY 1 ORDER BY COUNT(*) DESC, 1 LIMIT 1",
+            (business_id,)
+        ).fetchall()
+        total = appointments[0] if appointments else 0
+        completed = appointments[3] if appointments else 0
+        cancelled = appointments[4] if appointments else 0
+        return {
+            "appointments_total": total,
+            "appointments_pending": appointments[1] if appointments else 0,
+            "appointments_confirmed": appointments[2] if appointments else 0,
+            "appointments_completed": completed,
+            "appointments_cancelled": cancelled,
+            "customers_total": customers,
+            "messages_total": messages,
+            "completion_rate": round((completed / total) * 100, 1) if total else 0,
+            "cancellation_rate": round((cancelled / total) * 100, 1) if total else 0,
+            "peak_hour": (f"{hour_rows[0][0]:02d}:00" if hour_rows else None),
+            "top_service": (service_rows[0][0] if service_rows else None),
+            "service_distribution": [{"service": r[0], "count": r[1]} for r in service_rows]
+        }
 def list_users(business_id):
     with connection() as conn:
         return conn.execute("SELECT id,email,role,created_at FROM users WHERE business_id=%s ORDER BY created_at",(business_id,)).fetchall()
