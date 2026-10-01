@@ -1134,7 +1134,29 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_json(404,{"error":"Abonelik eşleşmesi bulunamadı."}); return
                 event=str(data.get("iyziEventType","")).strip()
                 status="active" if event=="subscription.order.success" else "past_due"
-                database.update_subscription_status(business_id,status)
+                period_start=None
+                period_end=None
+                sub_ref=str(data.get("subscriptionReferenceCode","")).strip()
+                # Refresh provider details so the paid period has an explicit end.
+                if sub_ref:
+                    try:
+                        detail=iyzico_request("GET","/v2/subscription/subscriptions/"+sub_ref)
+                        if detail.get("status")=="success":
+                            items=((detail.get("data") or {}).get("items") or [])
+                            if items:
+                                item=items[0]
+                                period_start=item.get("startDate")
+                                period_end=item.get("endDate")
+                                detail_status=str(item.get("subscriptionStatus") or "").lower()
+                                if detail_status in {"active","trialing","cancelled","canceled","past_due","unpaid"}:
+                                    status="cancelled" if detail_status=="canceled" else detail_status
+                    except Exception as exc:
+                        print(f"IYZICO_WEBHOOK_DETAIL_WARNING: {exc}", flush=True)
+                database.update_subscription_status(
+                    business_id,status,
+                    period_start=period_start,
+                    period_end=period_end
+                )
                 self.send_json(200,{"success":True}); return
 
             if self.path == "/webhook/billing":
