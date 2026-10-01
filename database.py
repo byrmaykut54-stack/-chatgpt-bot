@@ -654,12 +654,23 @@ def list_audit_logs(business_id, limit=100):
     with connection() as conn:
         return conn.execute("SELECT id,user_id,action,target_type,target_id,details,created_at FROM audit_logs WHERE business_id=%s ORDER BY created_at DESC LIMIT %s",(business_id,min(max(int(limit),1),200))).fetchall()
 
-def get_user_permissions(user_id):
+def get_user_permissions(business_id_or_user_id, user_id=None):
+    """Return permissions using either legacy user_id or business-scoped (business_id, user_id) lookup."""
+    if user_id is None:
+        user_id = business_id_or_user_id
+        query = "SELECT role, permissions FROM users WHERE id=%s"
+        params = (user_id,)
+    else:
+        business_id = business_id_or_user_id
+        query = "SELECT role, permissions FROM users WHERE id=%s AND business_id=%s"
+        params = (user_id, business_id)
     with connection() as conn:
-        row=conn.execute("SELECT role, permissions FROM users WHERE id=%s",(user_id,)).fetchone()
-        if not row: return None
-        if row[0]=='owner': return {'appointments':True,'customers':True,'messages':True,'business_settings':True,'team':True,'reports':True}
-        return row[1] or {}
+        row=conn.execute(query,params).fetchone()
+    if not row:
+        return None
+    if row[0]=='owner':
+        return {'appointments':True,'customers':True,'messages':True,'business_settings':True,'team':True,'reports':True}
+    return row[1] or {}
 
 def update_user_permissions(business_id,user_id,permissions):
     with connection() as conn:
@@ -798,44 +809,3 @@ def create_or_update_subscription(business_id, provider, provider_customer_id, p
     status=str(status or "inactive").strip().lower()
     plan="pro"
     start=_parse_subscription_time(period_start)
-    end=_parse_subscription_time(period_end)
-    with connection() as conn:
-        row=conn.execute("""
-            INSERT INTO subscriptions
-              (business_id,provider,provider_customer_id,provider_subscription_id,plan,status,current_period_start,current_period_end,cancel_at_period_end)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
-            ON CONFLICT (business_id) DO UPDATE SET
-              provider=EXCLUDED.provider,
-              provider_customer_id=EXCLUDED.provider_customer_id,
-              provider_subscription_id=EXCLUDED.provider_subscription_id,
-              plan=EXCLUDED.plan,
-              status=EXCLUDED.status,
-              current_period_start=COALESCE(EXCLUDED.current_period_start,subscriptions.current_period_start),
-              current_period_end=COALESCE(EXCLUDED.current_period_end,subscriptions.current_period_end),
-              cancel_at_period_end=EXCLUDED.cancel_at_period_end,
-              updated_at=NOW()
-            RETURNING id
-        """,(business_id,str(provider or ""),str(provider_customer_id or ""),str(provider_subscription_id or ""),plan,status,start,end,bool(cancel_at_period_end))).fetchone()
-        business_status="active" if status in {"active","trialing"} else "inactive"
-        business_plan="pro" if status in {"active","trialing","past_due","unpaid"} else "trial"
-        conn.execute("UPDATE businesses SET plan=%s,status=%s WHERE id=%s",(business_plan,business_status,business_id))
-        conn.commit()
-        return row[0]
-
-def update_subscription_status(business_id,status,cancel_at_period_end=None,period_end=None):
-    status=str(status or "inactive").strip().lower()
-    with connection() as conn:
-        if cancel_at_period_end is None and period_end is None:
-            conn.execute("UPDATE subscriptions SET status=%s,updated_at=NOW() WHERE business_id=%s",(status,business_id))
-        else:
-            end=_parse_subscription_time(period_end)
-            conn.execute("UPDATE subscriptions SET status=%s,cancel_at_period_end=COALESCE(%s,cancel_at_period_end),current_period_end=COALESCE(%s,current_period_end),updated_at=NOW() WHERE business_id=%s",(status,cancel_at_period_end,end,business_id))
-        business_status="active" if status in {"active","trialing"} else "inactive"
-        business_plan="pro" if status in {"active","trialing","past_due","unpaid"} else "trial"
-        conn.execute("UPDATE businesses SET plan=%s,status=%s WHERE id=%s",(business_plan,business_status,business_id))
-        conn.commit()
-
-def get_business_by_provider_subscription(provider_subscription_id):
-    with connection() as conn:
-        row=conn.execute("SELECT business_id FROM subscriptions WHERE provider_subscription_id=%s LIMIT 1",(str(provider_subscription_id or ""),)).fetchone()
-    return row[0] if row else None
