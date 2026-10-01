@@ -578,7 +578,7 @@ def get_business_report(business_id):
             (business_id,)
         ).fetchall()
         hour_rows = conn.execute(
-            "SELECT split_part(time, ':', 1)::int AS hour, COUNT(*) FROM appointments WHERE business_id=%s AND time ~ '^[0-9]{2}:[0-9]{2}
+            "SELECT split_part(time, ':', 1)::int AS hour, COUNT(*) FROM appointments WHERE business_id=%s AND length(time)=5 AND substring(time,3,1)=':'",
 
 def list_users(business_id):
     with connection() as conn:
