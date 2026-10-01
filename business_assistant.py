@@ -914,6 +914,20 @@ class Handler(BaseHTTPRequestHandler):
             config["whatsapp_connected"]=bool(whatsapp.get("phone_number_id") and whatsapp.get("access_token"))
             config.pop("whatsapp_access_token", None)
             self.send_json(200, config); return
+        if parsed.path == "/api/availability":
+            user=auth_required(self)
+            if not user: return
+            if not user_can(user,"appointments"):
+                self.send_json(403,{"error":"Randevulara erişim yetkiniz yok."}); return
+            config=business_config_for_user(user)
+            date=(parse_qs(parsed.query).get("date") or [""])[0].strip()
+            try:
+                datetime.strptime(date,"%Y-%m-%d")
+            except ValueError:
+                self.send_json(400,{"error":"Geçerli bir tarih seçin."}); return
+            slots=get_free_slots(date,config,user)
+            self.send_json(200,{"date":date,"closed":is_closed_day(date,config),"slots":slots,"working_hours":config.get("working_hours","09:00-18:00")}); return
+
         if parsed.path == "/api/appointments":
             user=auth_required(self)
             if not user: return
