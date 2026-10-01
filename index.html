@@ -975,6 +975,7 @@ async function loadDashboard(){
  const report=rr.ok?await rr.json():null;
  checkAppointmentNotifications(items);checkUpcomingReminders(items);
  const todayItems=items.filter(x=>x.date===today),pending=items.filter(x=>x.status==="pending"),confirmed=items.filter(x=>x.status==="confirmed");
+ setText("nxApptTodayStat",todayItems.length); setText("nxApptPendingStat",pending.length); setText("nxApptConfirmedStat",confirmed.length); setText("nxApptViewStat",nxAppointmentView==="calendar"?"TAKVİM":"LİSTE");
  nxAppointmentCache=items; nxRenderAppointmentCenter(items);
  const setText=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=String(v??0);};
  if(report){setText("reportTotal",report.appointments_total);setText("reportCompleted",report.appointments_completed);setText("reportCancelled",report.appointments_cancelled);setText("reportTotalPage",report.appointments_total);setText("reportCompletedPage",report.appointments_completed);setText("reportPendingPage",report.appointments_pending);setText("reportCancelledPage",report.appointments_cancelled);setText("reportCustomersPage",report.customers_total);setText("reportMessagesPage",report.messages_total);}
@@ -1126,6 +1127,7 @@ async function authInit(){
   });
 }
 function nxSetPage(page,writeHash=true){
+ const savedScrollY=window.scrollY;
  const allowed=["dashboard","appointments","customers","messages","team","settings","subscription","usage","audit","reports"];
  if(!allowed.includes(page))page="dashboard";
  document.querySelectorAll(".nx-page").forEach(el=>el.classList.toggle("nx-hidden",el.dataset.nxPage!==page));
@@ -1134,7 +1136,10 @@ function nxSetPage(page,writeHash=true){
  const m=meta[page]||meta.dashboard;document.getElementById("nxPageHead").querySelector("h2").textContent=m[0];document.getElementById("nxPageHint").textContent=m[1];
  if(writeHash)history.replaceState(null,"","#"+page);
  const heroDate=document.getElementById("nxHeroDate"); if(heroDate)heroDate.textContent=new Date().toLocaleDateString("tr-TR",{weekday:"long",day:"numeric",month:"long"});
- // Menü seçildiğinde sayfanın mevcut dikey konumu korunur.
+ // Menü değişiminde tarayıcının otomatik scroll davranışı devre dışı bırakılır;
+ // kullanıcı hangi dikey konumdaysa aynı konum korunur.
+ window.scrollTo(0,savedScrollY);
+ requestAnimationFrame(()=>window.scrollTo(0,savedScrollY));
 }
 document.querySelectorAll("#nexoraNav [data-page]").forEach(btn=>btn.addEventListener("click",()=>{nxSetPage(btn.dataset.page);nxCloseMenu();}));
 const nxMenuTrigger=document.getElementById("nxMenuTrigger"),nxMenuPanel=document.getElementById("nexoraNav");
