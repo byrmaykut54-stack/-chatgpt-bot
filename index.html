@@ -836,6 +836,11 @@ td{border-bottom-color:#222!important;color:#ddd!important}
     <div class="card nx-report-card"><span>TAMAMLANAN</span><strong id="reportCompletedPage">0</strong><small>Hizmet verilen</small></div>
     <div class="card nx-report-card"><span>BEKLEYEN</span><strong id="reportPendingPage">0</strong><small>Onay bekleyen</small></div>
     <div class="card nx-report-card"><span>İPTAL</span><strong id="reportCancelledPage">0</strong><small>İptal edilen</small></div>
+  </div><div class="nx-report-grid">
+    <div class="card nx-report-card"><span>TAMAMLANMA ORANI</span><strong id="reportCompletionRate">0%</strong><small>Tamamlanan / toplam</small></div>
+    <div class="card nx-report-card"><span>İPTAL ORANI</span><strong id="reportCancellationRate">0%</strong><small>İptal / toplam</small></div>
+    <div class="card nx-report-card"><span>YOĞUN SAAT</span><strong id="reportPeakHour">—</strong><small>En çok randevu</small></div>
+    <div class="card nx-report-card"><span>POPÜLER HİZMET</span><strong id="reportTopService">—</strong><small>En çok tercih edilen</small></div>
   </div>
   <div class="nx-dashboard-columns">
     <section class="card nx-report-detail">
@@ -1064,7 +1069,7 @@ async function loadDashboard(){
  }
  setText("nxApptTodayStat",todayItems.length); setText("nxApptPendingStat",pending.length); setText("nxApptConfirmedStat",confirmed.length); setText("nxApptViewStat",nxAppointmentView==="calendar"?"TAKVİM":"LİSTE");
  nxAppointmentCache=items; nxRenderAppointmentCenter(items);
- if(report){setText("reportTotal",report.appointments_total);setText("reportCompleted",report.appointments_completed);setText("reportCancelled",report.appointments_cancelled);setText("reportTotalPage",report.appointments_total);setText("reportCompletedPage",report.appointments_completed);setText("reportPendingPage",report.appointments_pending);setText("reportCancelledPage",report.appointments_cancelled);setText("reportCustomersPage",report.customers_total);setText("reportMessagesPage",report.messages_total);}
+ if(report){setText("reportTotal",report.appointments_total);setText("reportCompleted",report.appointments_completed);setText("reportCancelled",report.appointments_cancelled);setText("reportTotalPage",report.appointments_total);setText("reportCompletedPage",report.appointments_completed);setText("reportPendingPage",report.appointments_pending);setText("reportCancelledPage",report.appointments_cancelled);setText("reportCustomersPage",report.customers_total);setText("reportMessagesPage",report.messages_total);setText("reportCompletionRate",(report.completion_rate??0)+"%");setText("reportCancellationRate",(report.cancellation_rate??0)+"%");setText("reportPeakHour",report.peak_hour||"—");setText("reportTopService",report.top_service||"—");}
 
  document.getElementById("todayCount").textContent=todayItems.length;
  document.getElementById("pendingCount").textContent=pending.length;
