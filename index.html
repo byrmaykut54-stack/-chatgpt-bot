@@ -305,6 +305,20 @@ body{
 }
 .nx-icon-btn:hover,.nx-logout-btn:hover{background:#202020!important;border-color:#3a3a3a!important}
 .nx-notify-dot{background:var(--tc-gold)!important}
+/* NEXORA notification center */
+.nx-notify-wrap{position:relative;display:inline-flex}
+.nx-notify-panel{display:none;position:absolute;right:0;top:52px;width:min(390px,calc(100vw - 28px));background:rgba(14,14,14,.98);border:1px solid #2b2b2b;border-radius:18px;box-shadow:0 24px 70px rgba(0,0,0,.55);z-index:220;padding:14px;backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px)}
+.nx-notify-panel.is-open{display:block}
+.nx-notify-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:2px 2px 12px;border-bottom:1px solid #262626}
+.nx-notify-head strong{font-size:13px;color:#f5f5f2}.nx-notify-head span{font-size:10px;color:#777}
+.nx-notify-clear{background:transparent!important;color:#cdb879!important;padding:5px 7px;font-size:10px;border:1px solid #302c22!important}
+.nx-notify-list{display:grid;gap:7px;max-height:360px;overflow:auto;padding-top:10px}
+.nx-notify-item{display:grid;grid-template-columns:32px 1fr;gap:10px;padding:11px;border:1px solid #242424;border-radius:13px;background:#111;color:#ddd;text-align:left;cursor:pointer}
+.nx-notify-item:hover{background:#171717;border-color:#3a3425}.nx-notify-icon{width:32px;height:32px;border-radius:10px;display:grid;place-items:center;background:#201d15;color:#d7bd72;font-size:13px}
+.nx-notify-item b{display:block;font-size:11px;color:#f5f5f2;margin-bottom:3px}.nx-notify-item small{display:block;color:#858585;font-size:10px;line-height:1.45}
+.nx-notify-empty{padding:24px 10px;text-align:center;color:#777;font-size:11px}.nx-notify-empty b{display:block;color:#ddd;margin-bottom:4px}
+@media(max-width:600px){.nx-notify-panel{position:fixed;right:14px;top:72px;width:calc(100vw - 28px);max-height:calc(100vh - 92px)}}
+
 .nx-menu-wrap{margin-bottom:16px!important}
 .nx-menu-trigger{
   background:linear-gradient(135deg,#111,#1a1a1a)!important;
@@ -624,7 +638,7 @@ td{border-bottom-color:#222!important;color:#ddd!important}
 <div id="masterPanel" class="master-panel nx-master" style="display:none"><div class="nx-master-top"><div><div class="label">NEXORA PLATFORM CONTROL</div><h2>👑 Yönetici Merkezi</h2><div class="muted">Platformun tamamını tek ekrandan izleme ve yönetim alanı</div></div><div class="nx-master-tools"><div id="nxMasterHealth" class="nx-health"><span class="nx-dot"></span> Sistem kontrol ediliyor...</div><button type="button" id="masterRefreshBtn" class="primary">↻ Yenile</button></div></div>
 <div class="nx-master-stats"><div class="nx-ms"><div class="label">İŞLETMELER</div><div class="num" id="masterBusinesses">0</div><div class="sub">Toplam işletme</div></div><div class="nx-ms"><div class="label">KULLANICILAR</div><div class="num" id="masterUsers">0</div><div class="sub">Kayıtlı kullanıcı</div></div><div class="nx-ms"><div class="label">RANDEVULAR</div><div class="num" id="masterAppointments">0</div><div class="sub">Toplam randevu</div></div><div class="nx-ms"><div class="label">MESAJLAR</div><div class="num" id="masterMessages">0</div><div class="sub">AI / müşteri mesajı</div></div><div class="nx-ms"><div class="label">AKTİF PLANLAR</div><div class="num" id="masterActivePlans">0</div><div class="sub">Pro + Trial</div></div></div>
 <div class="nx-master-filter"><input id="masterSearch" placeholder="🔎 İşletme adı ara"><select id="masterPlanFilter"><option value="">Tüm planlar</option><option value="trial">Trial</option><option value="pro">Pro</option></select><select id="masterStatusFilter"><option value="">Tüm durumlar</option><option value="active">Aktif</option><option value="suspended">Askıda</option></select></div>
-<div id="masterBusinessTable" class="master-table nx-master-table"></div><div id="nxMasterDetail" class="nx-master-detail"></div></div><div class="top"><div><div style="display:flex;align-items:center;gap:10px"><div class="dash-mark">N</div><div><h1>NEXORA</h1><div id="business" class="muted">İşletme bilgileri yükleniyor...</div></div></div><div class="nx-top-actions"><div class="muted" id="todayLabel"></div><div class="nx-action-group"><button type="button" id="notifyBtn" class="nx-icon-btn" aria-label="Bildirimler" title="Bildirimler"><span class="nx-action-icon">⌁</span><span class="nx-notify-dot" id="notifyDot" hidden></span></button><button type="button" id="installBtn" class="nx-icon-btn nx-install-btn" aria-label="Uygulamayı yükle" title="Uygulamayı yükle" hidden>⌄</button><button type="button" id="logoutBtn" class="nx-logout-btn"><span class="nx-logout-icon">↪</span><span>Çıkış</span></button></div></div></div>
+<div id="masterBusinessTable" class="master-table nx-master-table"></div><div id="nxMasterDetail" class="nx-master-detail"></div></div><div class="top"><div><div style="display:flex;align-items:center;gap:10px"><div class="dash-mark">N</div><div><h1>NEXORA</h1><div id="business" class="muted">İşletme bilgileri yükleniyor...</div></div></div><div class="nx-top-actions"><div class="muted" id="todayLabel"></div><div class="nx-action-group"><div class="nx-notify-wrap"><button type="button" id="notifyBtn" class="nx-icon-btn" aria-label="Bildirimler" title="Bildirimler" aria-expanded="false"><span class="nx-action-icon">⌁</span><span class="nx-notify-dot" id="notifyDot" hidden></span></button><div id="nxNotificationPanel" class="nx-notify-panel" role="dialog" aria-label="Bildirimler"><div class="nx-notify-head"><div><strong>Bildirim Merkezi</strong><span id="nxNotificationSummary">Güncel işletme bildirimleri</span></div><button type="button" id="nxNotificationClear" class="nx-notify-clear">Tümünü okundu say</button></div><div id="nxNotificationList" class="nx-notify-list"><div class="nx-notify-empty">Bildirimler yükleniyor...</div></div></div></div><button type="button" id="installBtn" class="nx-icon-btn nx-install-btn" aria-label="Uygulamayı yükle" title="Uygulamayı yükle" hidden>⌄</button><button type="button" id="logoutBtn" class="nx-logout-btn"><span class="nx-logout-icon">↪</span><span>Çıkış</span></button></div></div></div>
 </div><div class="nx-menu-wrap">
 <button id="nxMenuTrigger" class="nx-menu-trigger" type="button" aria-expanded="false" aria-controls="nexoraNav">☰ <span>Menü</span></button>
 <nav id="nexoraNav" class="nx-nav nx-menu-panel" aria-label="NEXORA menü">
@@ -919,6 +933,38 @@ async function enableNotifications(){
     else alert("Bildirim izni verilmedi.");
   }catch(e){alert("Bildirimler açılamadı.");}
 }
+function nxNotificationTime(x){
+  const d=(x.date||"")+" "+(x.time||"");
+  return d.trim()||"Zaman belirtilmemiş";
+}
+function nxNotificationItems(items){
+  const list=Array.isArray(items)?items:[];
+  const active=list.filter(x=>x.status!=="cancelled");
+  const pending=active.filter(x=>x.status==="pending").sort((a,b)=>String(a.date+a.time).localeCompare(String(b.date+b.time)));
+  const today=active.filter(x=>x.date===today).sort((a,b)=>String(a.time).localeCompare(String(b.time)));
+  const upcoming=active.filter(x=>x.date>today).sort((a,b)=>String(a.date+a.time).localeCompare(String(b.date+b.time)));
+  const out=[];
+  pending.slice(0,5).forEach(x=>out.push({key:"pending-"+x.id,icon:"!",title:"Onay bekleyen randevu",body:(x.customer_name||"Müşteri")+" • "+nxNotificationTime(x),id:x.id}));
+  today.slice(0,5).forEach(x=>{if(x.status!=="pending")out.push({key:"today-"+x.id,icon:"•",title:"Bugünkü randevu",body:(x.customer_name||"Müşteri")+" • "+nxNotificationTime(x),id:x.id});});
+  upcoming.slice(0,3).forEach(x=>out.push({key:"upcoming-"+x.id,icon:"→",title:"Yaklaşan randevu",body:(x.customer_name||"Müşteri")+" • "+nxNotificationTime(x),id:x.id}));
+  return out.slice(0,10);
+}
+function nxRenderNotifications(items){
+  const panel=document.getElementById("nxNotificationPanel"),list=document.getElementById("nxNotificationList"),dot=document.getElementById("notifyDot"),summary=document.getElementById("nxNotificationSummary");
+  if(!list)return;
+  const rows=nxNotificationItems(items);
+  const unreadKey="nexora-read-notifications";
+  let read=[];try{read=JSON.parse(localStorage.getItem(unreadKey)||"[]")}catch(e){}
+  const readSet=new Set(Array.isArray(read)?read:[]);
+  const unread=rows.filter(x=>!readSet.has(x.key));
+  if(dot)dot.hidden=unread.length===0;
+  if(summary)summary.textContent=unread.length?unread.length+" okunmamış bildirim":"Güncel işletme bildirimleri";
+  list.innerHTML=rows.length?rows.map(x=>'<button type="button" class="nx-notify-item" data-notification-id="'+escapeHtml(String(x.id))+'" data-notification-key="'+escapeHtml(x.key)+'"><span class="nx-notify-icon">'+escapeHtml(x.icon)+'</span><span><b>'+escapeHtml(x.title)+'</b><small>'+escapeHtml(x.body)+'</small></span></button>').join(""):'<div class="nx-notify-empty"><b>Şu an yeni bildirim yok</b>Yeni randevu ve durum değişiklikleri burada görünecek.</div>';
+  list.querySelectorAll("[data-notification-id]").forEach(btn=>btn.addEventListener("click",()=>{const key=btn.dataset.notificationKey;try{const a=JSON.parse(localStorage.getItem(unreadKey)||"[]");if(!a.includes(key))a.push(key);localStorage.setItem(unreadKey,JSON.stringify(a.slice(-500)))}catch(e){}nxRenderNotifications(nxAppointmentCache);nxCloseNotificationPanel();nxOpenAppointmentDetail(btn.dataset.notificationId)}));
+}
+function nxOpenNotificationPanel(){const p=document.getElementById("nxNotificationPanel"),b=document.getElementById("notifyBtn");if(!p)return;p.classList.add("is-open");b?.setAttribute("aria-expanded","true");nxRenderNotifications(nxAppointmentCache)}
+function nxCloseNotificationPanel(){const p=document.getElementById("nxNotificationPanel"),b=document.getElementById("notifyBtn");p?.classList.remove("is-open");b?.setAttribute("aria-expanded","false")}
+function nxToggleNotificationPanel(){const p=document.getElementById("nxNotificationPanel");if(!p)return;p.classList.contains("is-open")?nxCloseNotificationPanel():nxOpenNotificationPanel()}
 function checkAppointmentNotifications(items){
   try{
     const todayItems=Array.isArray(items)?items.filter(x=>x.date===today&&x.status!=="cancelled"):[];
@@ -1060,7 +1106,7 @@ async function loadDashboard(){
  const messages=mr.ok?await mr.json():[];
  const customers=cr.ok?await cr.json():[];
  const report=rr.ok?await rr.json():null;
- checkAppointmentNotifications(items);checkUpcomingReminders(items);
+ checkAppointmentNotifications(items);checkUpcomingReminders(items);nxRenderNotifications(items);
  const setText=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=String(v??0);};
  const todayItems=items.filter(x=>x.date===today),pending=items.filter(x=>x.status==="pending"),confirmed=items.filter(x=>x.status==="confirmed");
  const requestRow=document.getElementById("nxRequestRow");
@@ -1283,6 +1329,9 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape")nxCloseMenu();});
 window.addEventListener("hashchange",()=>nxSetPage(location.hash.slice(1)||"dashboard",false));
 nxSetPage(location.hash.slice(1)||"dashboard",false);
 
+document.getElementById("notifyBtn")?.addEventListener("click",e=>{e.stopPropagation();nxToggleNotificationPanel()});
+document.getElementById("nxNotificationClear")?.addEventListener("click",()=>{try{localStorage.setItem("nexora-read-notifications",JSON.stringify(nxNotificationItems(nxAppointmentCache).map(x=>x.key).slice(-500)))}catch(e){}nxRenderNotifications(nxAppointmentCache)});
+document.addEventListener("click",e=>{if(!e.target.closest(".nx-notify-wrap"))nxCloseNotificationPanel()});
 const nxHeroDate=document.getElementById("nxHeroDate");if(nxHeroDate)nxHeroDate.textContent=new Date().toLocaleDateString("tr-TR",{weekday:"long",day:"numeric",month:"long"});handleAuthTokens().then(authInit);
 setInterval(()=>{if(document.getElementById("app").style.display!=="none")loadDashboard();},30000);
 const businessForm=document.getElementById("businessForm");
