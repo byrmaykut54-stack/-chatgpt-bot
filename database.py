@@ -809,3 +809,183 @@ def create_or_update_subscription(business_id, provider, provider_customer_id, p
     status=str(status or "inactive").strip().lower()
     plan="pro"
     start=_parse_subscription_time(period_start)
+
+
+# --- NEXORA subscription compatibility layer ---
+# Kept at the end so legacy callers and business-scoped callers share one
+# authoritative subscription implementation.
+
+def get_business_subscription(business_id):
+    now = datetime.now(timezone.utc)
+    with connection() as conn:
+        business = conn.execute(
+            "SELECT plan,status,trial_ends_at FROM businesses WHERE id=%s",
+            (business_id,)
+        ).fetchone()
+        subscription = conn.execute(
+            "SELECT plan,status,current_period_end,cancel_at_period_end "
+            "FROM subscriptions WHERE business_id=%s",
+            (business_id,)
+        ).fetchone()
+    if not business:
+        return {"plan":"trial","status":"unknown","trial_ends_at":None,"trial_active":False}
+
+    plan = str(business[0] or "trial").lower()
+    status = str(business[1] or "inactive").lower()
+    trial_ends = business[2]
+
+    if plan == "trial":
+        trial_active = status == "active" and (trial_ends is None or trial_ends > now)
+        return {
+            "plan":"trial",
+            "status":status,
+            "trial_ends_at":trial_ends.isoformat() if trial_ends else None,
+            "trial_active":trial_active
+        }
+
+    # Pro remains accessible through the paid period, including a
+    # cancel-at-period-end state. Once the paid period has ended, access
+    # falls back to an inactive trial state instead of remaining Pro forever.
+    paid_status = str(subscription[1] or "").lower() if subscription else ""
+    period_end = subscription[2] if subscription else None
+    cancel_at_end = bool(subscription[3]) if subscription else False
+    paid_active = (
+        plan == "pro"
+        and status == "active"
+        and paid_status in {"active","trialing","cancelled","canceled"}
+        and (period_end is None or period_end > now)
+    )
+    if paid_active:
+        return {
+            "plan":"pro",
+            "status":"active",
+            "trial_ends_at":None,
+            "trial_active":False
+        }
+
+    if plan == "pro" and period_end is not None and period_end <= now:
+        with connection() as conn:
+            conn.execute(
+                "UPDATE businesses SET plan='trial', status='inactive' WHERE id=%s",
+                (business_id,)
+            )
+            conn.commit()
+        return {"plan":"trial","status":"inactive","trial_ends_at":None,"trial_active":False}
+
+    return {
+        "plan":plan,
+        "status":status,
+        "trial_ends_at":trial_ends.isoformat() if trial_ends else None,
+        "trial_active":False
+    }
+
+def create_or_update_subscription(
+    business_id, provider, provider_customer_id, provider_subscription_id,
+    status="pending", period_start=None, period_end=None,
+    cancel_at_period_end=False
+):
+    status = str(status or "inactive").strip().lower()
+    if status == "canceled":
+        status = "cancelled"
+    start = _parse_subscription_time(period_start)
+    end = _parse_subscription_time(period_end)
+    cancel_at_period_end = bool(cancel_at_period_end)
+
+    with connection() as conn:
+        conn.execute(
+            """
+            INSERT INTO subscriptions
+            (business_id,provider,provider_customer_id,provider_subscription_id,
+             plan,status,current_period_start,current_period_end,
+             cancel_at_period_end,created_at,updated_at)
+            VALUES (%s,%s,%s,%s,'pro',%s,%s,%s,%s,NOW(),NOW())
+            ON CONFLICT (business_id) DO UPDATE SET
+              provider=EXCLUDED.provider,
+              provider_customer_id=CASE
+                WHEN EXCLUDED.provider_customer_id<>'' THEN EXCLUDED.provider_customer_id
+                ELSE subscriptions.provider_customer_id END,
+              provider_subscription_id=CASE
+                WHEN EXCLUDED.provider_subscription_id<>'' THEN EXCLUDED.provider_subscription_id
+                ELSE subscriptions.provider_subscription_id END,
+              plan='pro',
+              status=EXCLUDED.status,
+              current_period_start=COALESCE(EXCLUDED.current_period_start,subscriptions.current_period_start),
+              current_period_end=COALESCE(EXCLUDED.current_period_end,subscriptions.current_period_end),
+              cancel_at_period_end=EXCLUDED.cancel_at_period_end,
+              updated_at=NOW()
+            """,
+            (
+                business_id, str(provider or ""), str(provider_customer_id or ""),
+                str(provider_subscription_id or ""), status, start, end,
+                cancel_at_period_end
+            )
+        )
+
+        if status in {"active","trialing"}:
+            conn.execute(
+                "UPDATE businesses SET plan='pro', status='active', trial_ends_at=NULL WHERE id=%s",
+                (business_id,)
+            )
+        elif status in {"cancelled","canceled"}:
+            # Keep service access until the recorded paid period ends.
+            if end is None or end > datetime.now(timezone.utc):
+                conn.execute(
+                    "UPDATE businesses SET plan='pro', status='active', trial_ends_at=NULL WHERE id=%s",
+                    (business_id,)
+                )
+            else:
+                conn.execute(
+                    "UPDATE businesses SET plan='trial', status='inactive' WHERE id=%s",
+                    (business_id,)
+                )
+        elif status in {"past_due","unpaid"}:
+            # Preserve the paid plan while the provider's subscription is
+            # still inside its current period; otherwise stop access.
+            if end is not None and end > datetime.now(timezone.utc):
+                conn.execute(
+                    "UPDATE businesses SET plan='pro', status='active', trial_ends_at=NULL WHERE id=%s",
+                    (business_id,)
+                )
+            else:
+                conn.execute(
+                    "UPDATE businesses SET plan='pro', status='inactive', trial_ends_at=NULL WHERE id=%s",
+                    (business_id,)
+                )
+        else:
+            conn.execute(
+                "UPDATE businesses SET plan='pro', status='inactive', trial_ends_at=NULL WHERE id=%s",
+                (business_id,)
+            )
+        conn.commit()
+
+    return get_subscription_record(business_id)
+
+def update_subscription_status(
+    business_id, status, cancel_at_period_end=None, period_start=None, period_end=None
+):
+    record = get_subscription_record(business_id)
+    if not record:
+        return None
+    if cancel_at_period_end is None:
+        cancel_at_period_end = record.get("cancel_at_period_end", False)
+    return create_or_update_subscription(
+        business_id,
+        record.get("provider",""),
+        record.get("provider_customer_id",""),
+        record.get("provider_subscription_id",""),
+        status=status,
+        period_start=period_start or record.get("current_period_start"),
+        period_end=period_end or record.get("current_period_end"),
+        cancel_at_period_end=cancel_at_period_end
+    )
+
+def get_business_by_provider_subscription(provider_subscription_id):
+    ref = str(provider_subscription_id or "").strip()
+    if not ref:
+        return None
+    with connection() as conn:
+        row = conn.execute(
+            "SELECT business_id FROM subscriptions WHERE provider_subscription_id=%s LIMIT 1",
+            (ref,)
+        ).fetchone()
+    return row[0] if row else None
