@@ -570,7 +570,17 @@ td{border-bottom-color:#222!important;color:#ddd!important}
 <style>
 .nx-day .nx-appt{display:block;width:100%;border:0;text-align:left;cursor:pointer}.nx-day .nx-appt:hover{filter:brightness(.97);transform:translateY(-1px)}
 </style>
-</head>
+<style id="nx-modal-css">
+.nx-modal-backdrop{position:fixed;inset:0;z-index:10050;display:none;align-items:center;justify-content:center;padding:18px;background:rgba(0,0,0,.72);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+.nx-modal-backdrop.is-open{display:flex}.nx-modal{width:min(520px,100%);max-height:min(760px,calc(100vh - 36px));overflow:auto;background:linear-gradient(180deg,#151515,#0b0b0b);border:1px solid #303030;border-radius:24px;box-shadow:0 35px 100px rgba(0,0,0,.62);color:#f5f5f2}
+.nx-modal-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;padding:20px 20px 14px;border-bottom:1px solid #252525}.nx-modal-kicker{font-size:9px;font-weight:850;letter-spacing:.18em;color:var(--tc-gold)}.nx-modal-title{font-size:22px;font-weight:850;letter-spacing:-.035em;margin-top:5px}
+.nx-modal-close{width:38px;height:38px;min-height:38px;padding:0;border:1px solid #303030;background:#181818;color:#bbb;border-radius:12px;font-size:20px}.nx-modal-body{padding:18px 20px 20px}
+.nx-detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}.nx-detail-item{padding:12px;border:1px solid #292929;border-radius:14px;background:#111}.nx-detail-item span{display:block;font-size:9px;letter-spacing:.12em;color:#777;margin-bottom:5px}.nx-detail-item b{display:block;font-size:13px;color:#eee;overflow-wrap:anywhere}.nx-detail-service{grid-column:1/-1}
+.nx-modal-status{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px;padding:12px 13px;border:1px solid #292929;border-radius:14px;background:#101010}.nx-modal-status-label{font-size:9px;letter-spacing:.12em;color:#777}
+.nx-modal-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}.nx-modal-actions .nx-modal-wide{grid-column:1/-1}.nx-modal-actions button{min-height:44px}.nx-modal-note{font-size:10px;color:#777;line-height:1.5;margin-top:12px}
+.nx-create-status{min-height:18px;margin-top:9px;font-size:11px;color:#8d8d8d}.nx-create-status.ok{color:var(--tc-green)}.nx-create-status.err{color:#e58a8a}body.nx-modal-open{overflow:hidden}
+@media(max-width:560px){.nx-modal-backdrop{padding:10px;align-items:flex-end}.nx-modal{border-radius:22px 22px 18px 18px;max-height:88vh}.nx-detail-grid{grid-template-columns:1fr}.nx-detail-service{grid-column:auto}.nx-modal-title{font-size:20px}}
+</style></head>
 <body><div id="authScreen" class="auth-shell">
 <div class="auth-glow auth-glow-one"></div><div class="auth-glow auth-glow-two"></div>
 <div class="auth-card">
@@ -880,7 +890,7 @@ async function loadSubscription(){
  const i=document.getElementById("subscriptionInfo"); if(i)i.textContent=infoText;
  const i2=document.getElementById("nxSubscriptionInfo"); if(i2)i2.textContent=infoText;
  const btn=document.getElementById("proBtn"); const btn2=document.getElementById("nxProBtn");
- const action=async()=>{const endpoint=plan==="PRO"?"/api/billing/cancel":"/api/billing/start"; const rr=await fetch(endpoint,{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"}); const x=await rr.json().catch(()=>({})); if(rr.ok&&x.checkout_form_content){document.open();document.write('<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NEXORA Pro</title></head><body style="font-family:Arial,sans-serif;padding:20px"><div id="iyzico-checkout-form" class="responsive"></div>'+x.checkout_form_content+'</body></html>');document.close();return;} if(rr.ok&&x.checkout_url){window.location.href=x.checkout_url;return;} if(rr.ok){alert("İşlem tamamlandı.");loadSubscription();return;} alert(x.error||"İşlem gerçekleştirilemedi.");};
+ const action=async()=>{const endpoint=plan==="PRO"?"/api/billing/cancel":"/api/billing/start"; const rr=await fetch(endpoint,{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"}); const x=await rr.json().catch(()=>({})); if(rr.ok&&x.checkout_form_content){document.open();document.write('<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NEXORA Pro</title></head><body style="font-family:Arial,sans-serif;padding:20px"><div id="iyzico-checkout-form" class="responsive"></div>'+x.checkout_form_content+'<div id="nxAppointmentModal" class="nx-modal-backdrop" aria-hidden="true" role="dialog" aria-modal="true"><div class="nx-modal" role="document"><div class="nx-modal-head"><div><div class="nx-modal-kicker">RANDEVU DETAYI</div><div id="nxModalTitle" class="nx-modal-title">Randevu</div></div><button type="button" class="nx-modal-close" id="nxModalClose" aria-label="Kapat">×</button></div><div class="nx-modal-body"><div class="nx-detail-grid"><div class="nx-detail-item"><span>MÜŞTERİ</span><b id="nxModalCustomer">—</b></div><div class="nx-detail-item"><span>TELEFON</span><b id="nxModalPhone">—</b></div><div class="nx-detail-item"><span>TARİH</span><b id="nxModalDate">—</b></div><div class="nx-detail-item"><span>SAAT</span><b id="nxModalTime">—</b></div><div class="nx-detail-item nx-detail-service"><span>HİZMET</span><b id="nxModalService">—</b></div></div><div class="nx-modal-status"><span class="nx-modal-status-label">DURUM</span><span id="nxModalStatus"></span></div><div class="nx-modal-actions" id="nxModalActions"></div><div class="nx-modal-note">Randevu durumunu bu pencereden güncelleyebilir veya ayrıntılı randevu merkezine geçebilirsiniz.</div></div></div></div></body></html>');document.close();return;} if(rr.ok&&x.checkout_url){window.location.href=x.checkout_url;return;} if(rr.ok){alert("İşlem tamamlandı.");loadSubscription();return;} alert(x.error||"İşlem gerçekleştirilemedi.");};
  const label=plan==="PRO"?"Aboneliği İptal Et":"Pro'ya Geç";
  if(btn){btn.textContent=label;btn.onclick=action;} if(btn2){btn2.textContent=label;btn2.onclick=action;}
 }
@@ -963,10 +973,24 @@ function nxRenderAppointmentCenter(items){
 }
 window.nxOpenAppointmentDetail=function(id){
  const x=(nxAppointmentCache||[]).find(v=>String(v.id)===String(id)); if(!x)return;
- const status={pending:"Bekliyor",confirmed:"Onaylandı",cancelled:"İptal",completed:"Tamamlandı"}[x.status]||x.status||"—";
- const info="Müşteri: "+(x.customer_name||"—")+"\nTelefon: "+(x.phone||"—")+"\nTarih: "+(x.date||"—")+" "+(x.time||"—")+"\nHizmet: "+(x.service||"—")+"\nDurum: "+status;
- if(confirm(info+"\n\nRandevular sayfasını açmak ister misiniz?"))nxSetPage("appointments");
+ const modal=document.getElementById("nxAppointmentModal"); if(!modal)return;
+ document.getElementById("nxModalTitle").textContent=(x.customer_name||"Randevu")+" · "+(x.time||"—");
+ document.getElementById("nxModalCustomer").textContent=x.customer_name||"—";
+ document.getElementById("nxModalPhone").textContent=x.phone||"—";
+ document.getElementById("nxModalDate").textContent=x.date?nxFormatDateLabel(x.date):"—";
+ document.getElementById("nxModalTime").textContent=x.time||"—";
+ document.getElementById("nxModalService").textContent=x.service||"—";
+ document.getElementById("nxModalStatus").innerHTML=badge(x.status);
+ const actions=document.getElementById("nxModalActions"), safeId=escapeHtml(x.id);
+ actions.innerHTML=(x.status==="pending"
+   ? '<button type="button" class="approve" onclick="nxModalSetStatus(\\''+safeId+'\\',\\'confirmed\\')">✓ Onayla</button><button type="button" class="cancel" onclick="nxModalSetStatus(\\''+safeId+'\\',\\'cancelled\\')">✕ İptal</button>'
+   : x.status==="confirmed"
+     ? '<button type="button" class="approve" onclick="nxModalSetStatus(\\''+safeId+'\\',\\'completed\\')">✓ Tamamlandı</button><button type="button" class="cancel" onclick="nxModalSetStatus(\\''+safeId+'\\',\\'cancelled\\')">✕ İptal</button>'
+     : '')+'<button type="button" class="nx-command-secondary nx-modal-wide" onclick="nxSetPage(\\'appointments\\');nxCloseAppointmentModal()">Randevu merkezine geç →</button>';
+ modal.classList.add("is-open");modal.setAttribute("aria-hidden","false");document.body.classList.add("nx-modal-open");
 };
+window.nxCloseAppointmentModal=function(){const modal=document.getElementById("nxAppointmentModal");if(!modal)return;modal.classList.remove("is-open");modal.setAttribute("aria-hidden","true");document.body.classList.remove("nx-modal-open");};
+window.nxModalSetStatus=async function(id,status){await setStatus(id,status);nxCloseAppointmentModal();};
 function nxMoveAppointmentDay(delta){
   const d=new Date((document.getElementById("nxApptDate")?.value||nxAppointmentCenterDate)+"T12:00:00");
   d.setDate(d.getDate()+delta);
@@ -1052,9 +1076,28 @@ async function loadDashboard(){
 fetch("/api/business").then(r=>r.json()).then(b=>{const el=document.getElementById("business");if(el)el.textContent=b.business_name+" • "+b.sector+" • "+b.working_hours;}).catch(()=>{});
 
 document.getElementById("notifyBtn").addEventListener("click",enableNotifications);
+document.getElementById("nxModalClose")?.addEventListener("click",nxCloseAppointmentModal);
+document.getElementById("nxAppointmentModal")?.addEventListener("click",e=>{if(e.target.id==="nxAppointmentModal")nxCloseAppointmentModal();});
 nxInitAppointmentCenter(); nxInitCustomerTools();
-document.getElementById("date")?.setAttribute("min",localDateISO()); document.getElementById("date")?.setAttribute("value",localDateISO());
-document.getElementById("appointmentForm").addEventListener("submit",async e=>{e.preventDefault();const data={customer_name:document.getElementById("customer_name").value,phone:document.getElementById("phone").value,date:document.getElementById("date").value,time:document.getElementById("time").value,service:document.getElementById("service").value};const r=await fetch("/api/appointments",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify(data)});if(r.ok){const x=await r.json().catch(()=>null);e.target.reset();loadDashboard();if(x&&x.appointment)appointmentNotification(x.appointment,"Yeni randevu");alert("Randevu kaydedildi.");}else{const x=await r.json();alert(x.error||"Randevu kaydedilemedi.");}});
+const nxDateInput=document.getElementById("date");
+if(nxDateInput){nxDateInput.min=localDateISO();nxDateInput.value=localDateISO();}
+const nxApptForm=document.getElementById("appointmentForm");
+nxApptForm?.insertAdjacentHTML("beforeend",'<div id="nxCreateStatus" class="nx-create-status"></div>');
+nxApptForm?.addEventListener("submit",async e=>{
+ e.preventDefault();
+ const statusEl=document.getElementById("nxCreateStatus");
+ const data={customer_name:document.getElementById("customer_name").value.trim(),phone:document.getElementById("phone").value.trim(),date:document.getElementById("date").value,time:document.getElementById("time").value,service:document.getElementById("service").value.trim()};
+ if(!data.customer_name||!data.phone||!data.date||!data.time||!data.service){if(statusEl){statusEl.className="nx-create-status err";statusEl.textContent="Lütfen tüm randevu alanlarını doldurun.";}return;}
+ const todayIso=localDateISO();
+ if(data.date<todayIso){if(statusEl){statusEl.className="nx-create-status err";statusEl.textContent="Geçmiş bir tarihe randevu oluşturulamaz.";}return;}
+ if(data.time<"09:00"||data.time>="18:00"){if(statusEl){statusEl.className="nx-create-status err";statusEl.textContent="Çalışma saatleri 09:00–18:00 arasındadır.";}return;}
+ if(new Date(data.date+"T12:00:00").getDay()===0){if(statusEl){statusEl.className="nx-create-status err";statusEl.textContent="Pazar günleri işletme kapalıdır.";}return;}
+ if(statusEl){statusEl.className="nx-create-status";statusEl.textContent="Kaydediliyor...";}
+ const r=await fetch("/api/appointments",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify(data)});
+ const x=await r.json().catch(()=>({}));
+ if(r.ok){e.target.reset();if(nxDateInput)nxDateInput.value=localDateISO();if(statusEl){statusEl.className="nx-create-status ok";statusEl.textContent="✓ Randevu kaydedildi. Onay bekleyenler listesine eklendi.";}loadDashboard();if(x&&x.appointment)appointmentNotification(x.appointment,"Yeni randevu");}
+ else if(statusEl){statusEl.className="nx-create-status err";statusEl.textContent=x.error||"Randevu kaydedilemedi.";}
+});
 let deferredPrompt;window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferredPrompt=e;document.getElementById("installBtn").hidden=false;});document.getElementById("installBtn").addEventListener("click",async()=>{if(!deferredPrompt)return;deferredPrompt.prompt();await deferredPrompt.userChoice;deferredPrompt=null;document.getElementById("installBtn").hidden=true;});if("serviceWorker" in navigator)navigator.serviceWorker.register("./service-worker.js").catch(()=>{});
 async function handleAuthTokens(){
  const q=new URLSearchParams(location.search);
