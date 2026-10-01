@@ -662,8 +662,42 @@ let deferredPrompt;window.addEventListener("beforeinstallprompt",e=>{e.preventDe
 async function handleAuthTokens(){
  const q=new URLSearchParams(location.search);
  const reset=q.get("reset_token"), verify=q.get("verify_token");
- if(verify){const r=await fetch("/api/auth/verify-email",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({token:verify})});const x=await r.json().catch(()=>({}));alert(x.message||x.error||"E-posta doğrulama sonucu alınamadı.");history.replaceState({},document.title,location.pathname);}
- if(reset){const p=prompt("Yeni şifrenizi girin (en az 8 karakter):");if(p){const r=await fetch("/api/auth/reset-password",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({token:reset,password:p})});const x=await r.json().catch(()=>({}));alert(x.message||x.error||"Şifre sıfırlama sonucu alınamadı.");}history.replaceState({},document.title,location.pathname);}
+ if(verify){
+   const r=await fetch("/api/auth/verify-email",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({token:verify})});
+   const x=await r.json().catch(()=>({}));
+   alert(x.message||x.error||"E-posta doğrulama sonucu alınamadı.");
+   history.replaceState({},document.title,location.pathname);
+ }
+ if(reset){
+   let shell=document.getElementById("authScreen");
+   let card=shell?.querySelector(".auth-card");
+   if(card){
+     const original=card.innerHTML;
+     card.innerHTML='<div class="auth-brand"><div class="auth-mark">N</div><div><div class="auth-name">NEXORA</div><div class="auth-tag">BUSINESS OS</div></div></div><div class="auth-copy"><div class="auth-eyebrow">GÜVENLİK</div><h1>Yeni şifrenizi belirleyin</h1><div class="auth-subtitle">Hesabınız için yeni bir şifre oluşturun. En az 8 karakter kullanın.</div></div><div class="auth-form-panel"><label class="auth-label">Yeni şifre</label><input id="nxResetPassword" type="password" minlength="8" maxlength="128" autocomplete="new-password" placeholder="Yeni şifreniz"><label class="auth-label">Yeni şifre tekrar</label><input id="nxResetPassword2" type="password" minlength="8" maxlength="128" autocomplete="new-password" placeholder="Şifrenizi tekrar girin"><div id="nxResetStatus" style="min-height:18px;font-size:11px;margin:4px 0 10px"></div><button id="nxResetBtn" class="primary full" type="button">Şifreyi Güncelle</button></div><div class="auth-safe">Sıfırlama bağlantısı tek kullanımlıktır ve 30 dakika geçerlidir.</div>';
+     const btn=document.getElementById("nxResetBtn"),st=document.getElementById("nxResetStatus");
+     btn.onclick=async()=>{
+       const p=document.getElementById("nxResetPassword").value, p2=document.getElementById("nxResetPassword2").value;
+       if(p.length<8){st.style.color="#9b2420";st.textContent="Şifre en az 8 karakter olmalıdır.";return;}
+       if(p!==p2){st.style.color="#9b2420";st.textContent="Şifreler eşleşmiyor.";return;}
+       btn.disabled=true;btn.textContent="Güncelleniyor...";st.textContent="";
+       try{
+         const r=await fetch("/api/auth/reset-password",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({token:reset,password:p})});
+         const x=await r.json().catch(()=>({}));
+         if(r.ok){
+           st.style.color="#18733d";st.textContent=x.message||"Şifreniz güncellendi.";
+           setTimeout(()=>{history.replaceState({},document.title,location.pathname);location.reload();},900);
+         }else{
+           st.style.color="#9b2420";st.textContent=x.error||"Sıfırlama bağlantısı geçersiz veya süresi dolmuş.";
+           btn.disabled=false;btn.textContent="Şifreyi Güncelle";
+         }
+       }catch(e){
+         st.style.color="#9b2420";st.textContent="Sunucuya bağlanılamadı. Lütfen tekrar deneyin.";
+         btn.disabled=false;btn.textContent="Şifreyi Güncelle";
+       }
+     };
+     document.getElementById("nxResetPassword").focus();
+   }
+ }
 }
 async function loadMasterPanel(){
  const panel=document.getElementById("masterPanel"); if(!panel)return;
