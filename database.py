@@ -659,12 +659,24 @@ def list_audit_logs(business_id, limit=100):
     with connection() as conn:
         return conn.execute("SELECT id,user_id,action,target_type,target_id,details,created_at FROM audit_logs WHERE business_id=%s ORDER BY created_at DESC LIMIT %s",(business_id,min(max(int(limit),1),200))).fetchall()
 
-def get_user_permissions(user_id):
-    with connection() as conn:
-        row=conn.execute("SELECT role, permissions FROM users WHERE id=%s",(user_id,)).fetchone()
-        if not row: return None
-        if row[0]=='owner': return {'appointments':True,'customers':True,'messages':True,'business_settings':True,'team':True,'reports':True}
-        return row[1] or {}
+def get_user_permissions(business_id_or_user_id, user_id=None):
+    """Return permissions using either legacy user_id or business-scoped (business_id, user_id) lookup."""
+    if user_id is None:
+        user_id = business_id_or_user_id
+        with connection() as conn:
+            row=conn.execute("SELECT role, permissions FROM users WHERE id=%s",(user_id,)).fetchone()
+    else:
+        business_id = business_id_or_user_id
+        with connection() as conn:
+            row=conn.execute(
+                "SELECT role, permissions FROM users WHERE id=%s AND business_id=%s",
+                (user_id, business_id)
+            ).fetchone()
+    if not row:
+        return None
+    if row[0] == "owner":
+        return {"appointments":True,"customers":True,"messages":True,"business_settings":True,"team":True,"reports":True}
+    return row[1] or {}
 
 def update_user_permissions(business_id,user_id,permissions):
     with connection() as conn:
