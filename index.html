@@ -272,6 +272,267 @@ table td{color:#dbe0e8!important;border-color:var(--nx-line)!important}
 .nx-dashboard-hero + .grid .card{background:linear-gradient(145deg,#121821,#0e131a)!important}
 .nx-health{color:#aeb8c7}
 @media(max-width:800px){.wrap{padding:13px}.top{border-radius:18px}.card{border-radius:17px}.nx-dashboard-hero{border-radius:20px}}
+
+/* NEXORA / THECUT-INSPIRED DARK UI — 2026 */
+:root{
+  --tc-bg:#050505;--tc-panel:#101010;--tc-panel2:#151515;--tc-line:#252525;
+  --tc-text:#f5f5f2;--tc-muted:#929292;--tc-gold:#d7bd72;--tc-gold2:#b99846;
+  --tc-green:#7bc99b;--tc-red:#d87979;
+}
+html,body{background:var(--tc-bg)!important;color:var(--tc-text)!important}
+body{
+  font-family:Inter,-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text",Arial,sans-serif!important;
+  background:
+    radial-gradient(900px 500px at 80% -10%,rgba(215,189,114,.09),transparent 55%),
+    radial-gradient(700px 420px at -10% 20%,rgba(255,255,255,.035),transparent 55%),
+    #050505!important;
+}
+.wrap{max-width:1440px!important;padding:18px 22px 90px!important}
+.top{
+  background:rgba(15,15,15,.92)!important;border:1px solid #242424!important;
+  border-radius:18px!important;box-shadow:0 18px 55px rgba(0,0,0,.38)!important;
+  color:var(--tc-text)!important;backdrop-filter:blur(20px)!important;
+}
+.top h1{color:#fff!important;letter-spacing:.18em!important;font-size:22px!important}
+.muted{color:var(--tc-muted)!important}
+.dash-mark,.auth-mark{
+  background:linear-gradient(145deg,#171717,#050505)!important;
+  border:1px solid rgba(215,189,114,.55)!important;color:var(--tc-gold)!important;
+}
+.nx-top-actions{color:#aaa!important}
+.nx-icon-btn,.nx-logout-btn{
+  background:#151515!important;color:#ddd!important;border:1px solid #292929!important;
+}
+.nx-icon-btn:hover,.nx-logout-btn:hover{background:#202020!important;border-color:#3a3a3a!important}
+.nx-notify-dot{background:var(--tc-gold)!important}
+.nx-menu-wrap{margin-bottom:16px!important}
+.nx-menu-trigger{
+  background:linear-gradient(135deg,#111,#1a1a1a)!important;
+  color:#fff!important;border:1px solid #2b2b2b!important;
+}
+.nx-menu-panel{
+  background:rgba(12,12,12,.98)!important;border:1px solid #292929!important;
+  box-shadow:0 24px 70px rgba(0,0,0,.55)!important;
+}
+.nx-menu-panel button{
+  color:#a9a9a9!important;background:transparent!important;border:0!important;
+}
+.nx-menu-panel button:hover{background:#191919!important;color:#fff!important}
+.nx-menu-panel button.active{
+  background:linear-gradient(135deg,#e1c982,#b8954a)!important;
+  color:#090909!important;box-shadow:0 8px 24px rgba(215,189,114,.16)!important;
+}
+.nx-page-head{border-bottom:1px solid #222!important}
+.nx-page-head h2{color:#fff!important}
+.nx-page-head span{color:#777!important}
+
+/* Core surfaces */
+.card,.master-panel,.nx-master,.nx-appointment-workspace,.nx-appt-create,.nx-ai-workspace,
+.nx-team-create,.nx-team-manage,.nx-settings-main,.nx-billing-status,.nx-usage-card,
+.nx-audit-card,.nx-report-detail,.nx-insight-panel,.nx-message-panel,.nx-today-panel,
+.nx-pending-panel,.nx-crm-list{
+  background:linear-gradient(180deg,#111,#0d0d0d)!important;
+  border:1px solid #242424!important;
+  color:var(--tc-text)!important;
+  box-shadow:0 18px 50px rgba(0,0,0,.30)!important;
+}
+.card:hover{transform:translateY(-2px)!important;border-color:rgba(215,189,114,.25)!important}
+.card h2,.card h3,.card h4,.nx-panel-head h3,.nx-team-head b,.nx-set-section h3,
+.nx-appt-topline h3,.nx-crm-head h3,.nx-ai-head h3,.nx-settings-hero h3,
+.nx-billing-hero h3,.nx-usage-hero h3,.nx-report-hero h3,.nx-audit-hero h3{
+  color:#f7f7f3!important;
+}
+.label,.nx-hero-kicker,.nx-set-kicker,.nx-billing-kicker{color:var(--tc-gold)!important}
+
+/* Executive hero */
+.nx-command-hero,.nx-dashboard-hero,.nx-appt-topline,.nx-crm-head,.nx-ai-head,
+.nx-team-hero,.nx-settings-hero,.nx-billing-hero,.nx-usage-hero,.nx-report-hero,.nx-audit-hero{
+  background:
+    radial-gradient(circle at 88% 20%,rgba(215,189,114,.13),transparent 28%),
+    linear-gradient(135deg,#080808,#151515 58%,#101010)!important;
+  border:1px solid #292929!important;border-radius:22px!important;
+  color:#fff!important;box-shadow:0 24px 60px rgba(0,0,0,.35)!important;
+}
+.nx-command-copy h3,.nx-hero-copy h3{color:#fff!important}
+.nx-command-copy h3 span,.nx-hero-copy h3 span,.nx-report-hero h3 span{color:var(--tc-gold)!important}
+.nx-command-copy p,.nx-hero-copy p,.nx-appt-topline p,.nx-crm-head p,.nx-ai-head p,
+.nx-team-hero p,.nx-settings-hero p,.nx-billing-hero p,.nx-usage-hero p,.nx-report-hero p,.nx-audit-hero p{
+  color:#999!important;
+}
+.nx-live,.nx-ai-status,.nx-team-security,.nx-billing-badge,.nx-usage-badge,.nx-report-badge,.nx-audit-badge{
+  color:var(--tc-gold)!important;background:rgba(215,189,114,.08)!important;
+  border:1px solid rgba(215,189,114,.22)!important;
+}
+
+/* KPI / quick action cards */
+.nx-kpi,.nx-quick{
+  background:linear-gradient(180deg,#151515,#0e0e0e)!important;
+  border:1px solid #282828!important;color:#fff!important;
+  box-shadow:0 12px 34px rgba(0,0,0,.25)!important;
+}
+.nx-kpi:hover,.nx-quick:hover{border-color:rgba(215,189,114,.42)!important;background:#171717!important}
+.nx-kpi span,.nx-quick small{color:#858585!important}
+.nx-kpi strong,.nx-quick strong{color:#fff!important}
+.nx-kpi-main{border-color:rgba(215,189,114,.45)!important}
+.nx-kpi-main strong{color:var(--tc-gold)!important}
+
+/* Buttons */
+button{font-family:inherit!important}
+.primary{
+  background:linear-gradient(135deg,#e1c982,#b8954a)!important;
+  color:#080808!important;border:0!important;box-shadow:0 9px 24px rgba(215,189,114,.13)!important;
+}
+.primary:hover{background:linear-gradient(135deg,#f0dc9a,#c5a457)!important;color:#050505!important}
+.nx-command-secondary,.nx-hero-secondary{
+  background:#171717!important;color:#eee!important;border:1px solid #303030!important;
+}
+.approve{background:rgba(123,201,155,.13)!important;color:var(--tc-green)!important;border:1px solid rgba(123,201,155,.2)!important}
+.cancel{background:rgba(216,121,121,.1)!important;color:#e28a8a!important;border:1px solid rgba(216,121,121,.18)!important}
+
+/* Inputs */
+input,select,textarea{
+  background:#0b0b0b!important;color:#f1f1ed!important;border:1px solid #303030!important;
+}
+input::placeholder,textarea::placeholder{color:#666!important}
+input:focus,select:focus,textarea:focus{
+  border-color:rgba(215,189,114,.72)!important;
+  box-shadow:0 0 0 3px rgba(215,189,114,.08)!important;
+  background:#101010!important;
+}
+label,.nx-set-label,.nx-create-head span,.nx-team-head span{color:#a2a2a2!important}
+
+/* Tables / lists */
+table{color:#eee!important}
+th{color:#777!important;border-bottom-color:#292929!important}
+td{border-bottom-color:#222!important;color:#ddd!important}
+.badge.pending{background:rgba(215,189,114,.13)!important;color:var(--tc-gold)!important}
+.badge.confirmed{background:rgba(123,201,155,.12)!important;color:var(--tc-green)!important}
+.badge.cancelled{background:rgba(216,121,121,.12)!important;color:#e28a8a!important}
+.pill{background:#202020!important;color:#aaa!important}
+
+/* Appointment workspace */
+.nx-appt-stats>div{
+  background:#111!important;border:1px solid #292929!important;color:#fff!important;
+}
+.nx-appt-stats span{color:#777!important}.nx-appt-stats b{color:var(--tc-gold)!important}
+.nx-calbar .group button,.nx-appt-views button{
+  background:#171717!important;color:#aaa!important;border:1px solid #2b2b2b!important;
+}
+.nx-calbar .group button.active,.nx-appt-views button.active{
+  background:var(--tc-gold)!important;color:#090909!important;border-color:var(--tc-gold)!important;
+}
+.nx-filter{background:#0b0b0b!important}
+.nx-daygrid{background:#0b0b0b!important;border-color:#262626!important}
+.nx-day{background:#101010!important;border-color:#252525!important}
+.nx-day.today{border-color:rgba(215,189,114,.55)!important}
+.nx-dayhead b{color:var(--tc-gold)!important}
+.nx-appt{background:#1a1a1a!important;color:#ddd!important;border-left-color:var(--tc-gold)!important}
+
+/* CRM / AI / settings */
+.nx-crm-toolbar,.nx-ai-tools,.nx-settings-nav,.nx-set-section,.nx-team-note,
+.nx-settings-note,.nx-billing-status,.nx-plan-card,.nx-usage-info,.nx-audit-list{
+  background:#101010!important;border-color:#272727!important;color:#ddd!important;
+}
+.nx-customer,.nx-team-user,.nx-ms,.plan{
+  background:#141414!important;border-color:#292929!important;color:#ddd!important;
+}
+.nx-chat-list{background:#0b0b0b!important;border-right:1px solid #242424!important}
+.nx-chat-item{color:#aaa!important}.nx-chat-item.active,.nx-chat-item:hover{background:#1a1a1a!important;color:#fff!important}
+.nx-chat-main{background:#0d0d0d!important}
+.nx-chat-head{border-bottom:1px solid #242424!important;color:#fff!important}
+.nx-chat-body{background:#090909!important}
+.nx-msg.ai{background:#171717!important;color:#eee!important;border:1px solid #292929!important}
+.nx-msg.user{background:#1d1d1d!important;color:#eee!important}
+.nx-ai-tools button{background:#171717!important;color:#bbb!important;border:1px solid #2b2b2b!important}
+.nx-ai-tools button:hover{color:#fff!important;border-color:rgba(215,189,114,.4)!important}
+.nx-ai-compose{border-top:1px solid #242424!important;background:#0d0d0d!important}
+.nx-settings-nav button{color:#aaa!important}
+.nx-settings-nav button.active{background:#1b1b1b!important;color:var(--tc-gold)!important}
+.nx-settings-nav-divider{background:#292929!important}
+.nx-danger-zone{background:rgba(216,121,121,.05)!important;border-color:rgba(216,121,121,.22)!important}
+.nx-plan-pro{border-color:rgba(215,189,114,.55)!important;box-shadow:0 18px 45px rgba(215,189,114,.08)!important}
+.nx-plan-top b,.nx-plan-card h4{color:var(--tc-gold)!important}
+
+/* Login */
+.auth-shell{
+  background:#050505!important;color:#fff!important;
+}
+.auth-shell:before{
+  background:
+    radial-gradient(circle at 50% -10%,rgba(215,189,114,.12),transparent 35%),
+    radial-gradient(circle at 10% 100%,rgba(255,255,255,.035),transparent 35%),
+    #050505!important;
+}
+.auth-card{
+  background:rgba(13,13,13,.94)!important;border:1px solid #292929!important;
+  color:#fff!important;box-shadow:0 40px 120px rgba(0,0,0,.65)!important;
+}
+.auth-name,.auth-copy h1{color:#fff!important}.auth-tag,.auth-eyebrow{color:var(--tc-gold)!important}
+.auth-subtitle,.auth-safe,.auth-foot,.auth-toggle{color:#8b8b8b!important}
+.auth-form-panel{background:#101010!important;border-color:#292929!important}
+.auth-label{color:#aaa!important}
+.auth-secondary{background:#151515!important;color:#eee!important;border-color:#303030!important}
+.auth-divider{color:#666!important}.auth-divider:before,.auth-divider:after{background:#292929!important}
+.auth-link{color:var(--tc-gold)!important}
+.nexora-corp{color:#777!important}.nexora-corp-dot{color:var(--tc-gold)!important}
+.nexora-copyright{color:#555!important}
+#authError{color:#e58a8a!important}
+
+/* Master */
+.nx-master-top,.nx-master-stats,.nx-master-filter{color:#eee!important}
+.nx-ms{background:#141414!important;border-color:#292929!important}
+.nx-ms .num{color:var(--tc-gold)!important}.nx-ms .sub{color:#777!important}
+.nx-master-detail{background:#151515!important;border-color:#292929!important;color:#ddd!important}
+
+/* Make all hidden legacy light panels dark without changing behavior */
+.nx-panel-head>div>span,.nx-create-head p,.nx-set-desc,.nx-team-note,.nx-report-card small,
+.nx-report-card span,.nx-report-big span,.nx-usage-card small{color:#777!important}
+.nx-panel-head>button,.nx-team-head button{background:#171717!important;color:#bbb!important;border:1px solid #2a2a2a!important}
+.nx-panel-head>button:hover,.nx-team-head button:hover{color:#fff!important;border-color:#444!important}
+
+/* Responsive mobile — app-like theCut rhythm */
+@media(max-width:800px){
+  .wrap{padding:10px 10px 82px!important}
+  .top{padding:14px!important;border-radius:16px!important}
+  .top h1{font-size:18px!important}
+  .nx-menu-trigger{display:none!important}
+  .nx-menu-wrap{position:fixed!important;left:8px;right:8px;bottom:8px;z-index:9998;margin:0!important}
+  .nx-menu-panel{
+    position:static!important;display:flex!important;flex-direction:row!important;
+    overflow-x:auto!important;padding:6px!important;border-radius:17px!important;
+    gap:4px!important;box-shadow:0 14px 45px rgba(0,0,0,.65)!important;
+    scrollbar-width:none!important;
+  }
+  .nx-menu-panel::-webkit-scrollbar{display:none}
+  .nx-menu-panel button{min-width:max-content!important;padding:9px 12px!important;min-height:42px!important;font-size:10px!important}
+  .nx-menu-panel button span{display:none}
+  .nx-page-head{padding:8px 2px 12px!important}
+  .nx-page-head h2{font-size:18px!important}
+  .nx-command-hero,.nx-dashboard-hero,.nx-appt-topline,.nx-crm-head,.nx-ai-head,
+  .nx-team-hero,.nx-settings-hero,.nx-billing-hero,.nx-usage-hero,.nx-report-hero,.nx-audit-hero{
+    border-radius:18px!important;padding:20px!important;
+  }
+  .nx-command-copy h3,.nx-hero-copy h3{font-size:26px!important}
+  .nx-kpi-grid{grid-template-columns:repeat(2,1fr)!important}
+  .nx-kpi{min-height:128px!important}
+  .nx-dashboard-columns{grid-template-columns:1fr!important}
+  .nx-appt-main{grid-template-columns:1fr!important}
+  .nx-appt-create{position:static!important}
+  .nx-ai{grid-template-columns:1fr!important}
+  .nx-chat-list{display:none!important}
+  .nx-team-layout,.nx-settings,.nx-billing-status{grid-template-columns:1fr!important}
+  .nx-settings-nav{display:flex!important;overflow:auto!important}
+  .nx-settings-nav button{white-space:nowrap!important}
+  .nx-report-grid{grid-template-columns:repeat(2,1fr)!important}
+  .auth-card{padding:24px 18px!important;border-radius:22px!important}
+}
+@media(max-width:420px){
+  .nx-kpi-grid,.nx-report-grid{grid-template-columns:1fr 1fr!important}
+  .nx-kpi{min-height:112px!important;padding:14px!important}
+  .nx-kpi strong{font-size:30px!important}
+  .nx-menu-panel button{padding:8px 10px!important}
+}
+
 </style>
 
 <style id="nx-navigation-css">.nx-page{display:block}.nx-hidden{display:none!important}</style><style id="nx-calendar-css">.nx-calbar{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:12px}.nx-calbar .group{display:flex;gap:6px;align-items:center}.nx-calbar button{background:#f5f7f9;color:#344054}.nx-calbar button.active{background:#111827;color:#fff}.nx-filter{display:grid;grid-template-columns:1.2fr 1fr 1fr auto;gap:8px;margin-bottom:12px}.nx-filter input,.nx-filter select{margin:0}.nx-daygrid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}.nx-day{min-height:110px;border:1px solid #e8ebef;border-radius:12px;padding:8px;background:#fff}.nx-day.muted{background:#fafbfc}.nx-day.today{border-color:#b7a16a;box-shadow:inset 0 0 0 1px #b7a16a}.nx-dayhead{font-size:11px;font-weight:850;margin-bottom:7px;display:flex;justify-content:space-between}.nx-appt{font-size:10px;padding:6px 7px;border-radius:8px;background:#f0f8f3;margin:4px 0;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.nx-appt.pending{background:#fff7df}.nx-appt.cancelled{background:#fdebea;text-decoration:line-through}.nx-list-actions{display:flex;gap:5px;flex-wrap:wrap}.nx-list-actions button{font-size:10px;padding:6px 8px}.nx-detail{padding:14px;border:1px solid #e7eaee;border-radius:14px;background:#fafbfc;margin-top:10px}.nx-empty{padding:20px;text-align:center;color:#8a929d;border:1px dashed #dfe4e8;border-radius:12px}@media(max-width:700px){.nx-filter{grid-template-columns:1fr 1fr}.nx-daygrid{grid-template-columns:repeat(2,1fr)}.nx-day{min-height:90px}.nx-day:nth-child(n+7){display:none}.nx-calbar{align-items:stretch}.nx-calbar .group{width:100%}.nx-calbar .group button{flex:1}}</style>
