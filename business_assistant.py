@@ -623,8 +623,8 @@ def handle_customer_message(message, channel="web", customer_name="", phone="", 
         if not time:
             slots = get_free_slots(date, config, user)
             if slots:
-                return {"reply": f"Bugün ({date}) boş saatler: " + ", ".join(slots) + "."}
-            return {"reply": f"Bugün ({date}) için uygun boş saat görünmüyor."}
+                return {"reply": f"{date} günü boş saatler: " + ", ".join(slots) + "."}
+            return {"reply": f"{date} günü için uygun boş saat görünmüyor."}
         available = is_time_available(date, time, config, user)
         if available:
             return {"reply": f"Evet, {date} günü saat {time} şu an boş görünüyor."}
