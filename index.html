@@ -850,7 +850,7 @@ td{border-bottom-color:#222!important;color:#ddd!important}
     </section>
     <section class="card nx-report-detail">
       <div class="nx-panel-head"><div><span>YÖNETİM NOTU</span><h3>NEXORA önerisi</h3></div></div>
-      <div class="nx-report-advice">Önce <b>bekleyen randevuları</b> temizleyin; ardından günün boş saatlerini online rezervasyonla doldurun. AI asistanı fiyat ve uygunluk sorularını otomatik karşılayabilir.</div>
+      <div class="nx-report-advice">Önce <b>bekleyen randevuları</b> temizleyin; ardından günün boş saatlerini online rezervasyonla doldurun. AI asistanı fiyat ve uygunluk sorularını otomatik karşılayabilir.</div><div class="card nx-report-detail" style="margin-top:14px"><div class="nx-panel-head"><div><span>HİZMET DAĞILIMI</span><h3>En çok tercih edilen hizmetler</h3></div></div><div id="reportServiceDistribution" class="nx-history"><div class="muted">Veri bekleniyor...</div></div></div>
       <button type="button" class="primary" onclick="nxSetPage('appointments')">Randevu merkezine git →</button>
     </section>
   </div>
@@ -1069,7 +1069,7 @@ async function loadDashboard(){
  }
  setText("nxApptTodayStat",todayItems.length); setText("nxApptPendingStat",pending.length); setText("nxApptConfirmedStat",confirmed.length); setText("nxApptViewStat",nxAppointmentView==="calendar"?"TAKVİM":"LİSTE");
  nxAppointmentCache=items; nxRenderAppointmentCenter(items);
- if(report){setText("reportTotal",report.appointments_total);setText("reportCompleted",report.appointments_completed);setText("reportCancelled",report.appointments_cancelled);setText("reportTotalPage",report.appointments_total);setText("reportCompletedPage",report.appointments_completed);setText("reportPendingPage",report.appointments_pending);setText("reportCancelledPage",report.appointments_cancelled);setText("reportCustomersPage",report.customers_total);setText("reportMessagesPage",report.messages_total);setText("reportCompletionRate",(report.completion_rate??0)+"%");setText("reportCancellationRate",(report.cancellation_rate??0)+"%");setText("reportPeakHour",report.peak_hour||"—");setText("reportTopService",report.top_service||"—");}
+ if(report){setText("reportTotal",report.appointments_total);setText("reportCompleted",report.appointments_completed);setText("reportCancelled",report.appointments_cancelled);setText("reportTotalPage",report.appointments_total);setText("reportCompletedPage",report.appointments_completed);setText("reportPendingPage",report.appointments_pending);setText("reportCancelledPage",report.appointments_cancelled);setText("reportCustomersPage",report.customers_total);setText("reportMessagesPage",report.messages_total);setText("reportCompletionRate",(report.completion_rate??0)+"%");setText("reportCancellationRate",(report.cancellation_rate??0)+"%");setText("reportPeakHour",report.peak_hour||"—");setText("reportTopService",report.top_service||"—");const dist=document.getElementById("reportServiceDistribution");if(dist){const rows=Array.isArray(report.service_distribution)?report.service_distribution:[];dist.innerHTML=rows.length?rows.map(x=>`<div class="nx-history-row"><span>${escapeHtml(x.service||"Hizmet")}</span><b>${escapeHtml(x.count)} randevu</b><span>${report.appointments_total?Math.round((Number(x.count)/Number(report.appointments_total))*100):0}%</span></div>`).join(""):'<div class="muted">Henüz hizmet verisi yok.</div>';}}
 
  document.getElementById("todayCount").textContent=todayItems.length;
  document.getElementById("pendingCount").textContent=pending.length;
@@ -1088,7 +1088,7 @@ async function loadDashboard(){
 
 fetch("/api/business").then(r=>r.json()).then(b=>{const el=document.getElementById("business");if(el)el.textContent=b.business_name+" • "+b.sector+" • "+b.working_hours;}).catch(()=>{});
 
-document.getElementById("nxNewAppt")?.addEventListener("click",()=>{nxSetPage("appointments");setTimeout(()=>{const el=document.getElementById("appointmentCreateCard");el?.scrollIntoView({behavior:"smooth",block:"center"});document.getElementById("customer_name")?.focus();},50);});document.getElementById("notifyBtn").addEventListener("click",enableNotifications);
+document.getElementById("nxNewAppt")?.addEventListener("click",()=>{nxSetPage("appointments");setTimeout(()=>{const el=document.getElementById("appointmentCreateCard");el?.scrollIntoView({behavior:"smooth",block:"center"});document.getElementById("customer_name")?.focus();},50);});document.getElementById("notifyBtn")?.addEventListener("click",enableNotifications);
 document.getElementById("nxModalClose")?.addEventListener("click",nxCloseAppointmentModal);
 document.getElementById("nxAppointmentModal")?.addEventListener("click",e=>{if(e.target.id==="nxAppointmentModal")nxCloseAppointmentModal();});
 nxInitAppointmentCenter(); nxInitCustomerTools();
