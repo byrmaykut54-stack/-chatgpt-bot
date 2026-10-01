@@ -567,6 +567,9 @@ td{border-bottom-color:#222!important;color:#ddd!important}
 <style>
 .nx-row-actions{display:flex;gap:6px;flex-wrap:wrap}.nx-row-actions button{min-height:36px;padding:8px 10px;font-size:11px}@media(max-width:800px){.nx-row-actions{display:grid;grid-template-columns:1fr 1fr}.nx-row-actions button{width:100%}}
 </style>
+<style>
+.nx-day .nx-appt{display:block;width:100%;border:0;text-align:left;cursor:pointer}.nx-day .nx-appt:hover{filter:brightness(.97);transform:translateY(-1px)}
+</style>
 </head>
 <body><div id="authScreen" class="auth-shell">
 <div class="auth-glow auth-glow-one"></div><div class="auth-glow auth-glow-two"></div>
@@ -950,7 +953,7 @@ function nxRenderAppointmentCenter(items){
       const iso=d.toISOString().slice(0,10);
       const dayItems=nxAppointmentCache.filter(x=>x.date===iso).sort((a,b)=>String(a.time||"").localeCompare(String(b.time||"")));
       days.push('<div class="nx-day '+(iso===date?'today':'')+'"><div class="nx-dayhead"><span>'+escapeHtml(d.toLocaleDateString("tr-TR",{weekday:"short"}))+'</span><b>'+d.getDate()+'</b></div>'+
-        (dayItems.length?dayItems.slice(0,5).map(x=>'<div class="nx-appt '+escapeHtml(x.status||'')+'" title="'+escapeHtml(x.customer_name||'')+'">'+escapeHtml(x.time||'')+' · '+escapeHtml(x.customer_name||'')+'</div>').join(""):'<div class="muted" style="font-size:9px">Boş</div>')+
+        (dayItems.length?dayItems.slice(0,5).map(x=>'<button type="button" class="nx-appt '+escapeHtml(x.status||'')+'" title="'+escapeHtml(x.customer_name||'')+'" onclick="nxOpenAppointmentDetail(\''+escapeHtml(x.id)+'\')">'+escapeHtml(x.time||'')+' · '+escapeHtml(x.customer_name||'')+'</button>').join(""):'<div class="muted" style="font-size:9px">Boş</div>')+
       '</div>');
     }
     target.innerHTML='<div class="nx-daygrid">'+days.join("")+'</div>';
@@ -958,6 +961,12 @@ function nxRenderAppointmentCenter(items){
     target.innerHTML=appointmentTable(filtered);
   }
 }
+window.nxOpenAppointmentDetail=function(id){
+ const x=(nxAppointmentCache||[]).find(v=>String(v.id)===String(id)); if(!x)return;
+ const status={pending:"Bekliyor",confirmed:"Onaylandı",cancelled:"İptal",completed:"Tamamlandı"}[x.status]||x.status||"—";
+ const info="Müşteri: "+(x.customer_name||"—")+"\nTelefon: "+(x.phone||"—")+"\nTarih: "+(x.date||"—")+" "+(x.time||"—")+"\nHizmet: "+(x.service||"—")+"\nDurum: "+status;
+ if(confirm(info+"\n\nRandevular sayfasını açmak ister misiniz?"))nxSetPage("appointments");
+};
 function nxMoveAppointmentDay(delta){
   const d=new Date((document.getElementById("nxApptDate")?.value||nxAppointmentCenterDate)+"T12:00:00");
   d.setDate(d.getDate()+delta);
