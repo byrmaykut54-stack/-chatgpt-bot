@@ -631,7 +631,7 @@ td{border-bottom-color:#222!important;color:#ddd!important}
 <button class="primary full" type="submit">Giriş Yap</button>
 </form>
 <div class="auth-divider"><span>veya</span></div>
-<button id="setupBtn" class="full auth-secondary" type="button" onclick="const b=document.getElementById('authBusiness');const f=document.getElementById('authForm');b.style.display='block';b.required=true;f.querySelector('button[type=submit]').textContent='14 Günlük Denemeyi Başlat';document.getElementById('setupBtn').style.display='none';f.dataset.mode='register';document.getElementById('authModeHint').innerHTML='Zaten hesabınız var mı? <button type=&quot;button&quot; id=&quot;loginLink&quot;>Giriş yap</button>';document.getElementById('loginLink').onclick=function(){location.reload()};document.getElementById('authError').textContent=''">Yeni İşletme Hesabı Oluştur</button>
+<button id="setupBtn" class="full auth-secondary" type="button" onclick="const b=document.getElementById('authBusiness');const f=document.getElementById('authForm');b.style.display='block';b.required=true;f.querySelector('button[type=submit]').textContent='14 Günlük Denemeyi Başlat';document.getElementById('setupBtn').style.display='none';f.dataset.mode='register';document.getElementById('authModeHint').innerHTML='Zaten hesabınız var mı? <button type=&quot;button&quot; id=&quot;loginLink&quot;>Giriş yap</button>';document.getElementById('loginLink').onclick=function(){location.reload()};document.getElementById('authError').textContent=''">Yeni İşletme Hesabı Oluştur</button><button id="masterKeyBtn" class="full auth-secondary" type="button" style="margin-top:8px">Yönetici Anahtarı ile Giriş</button>
 <div class="auth-toggle" id="authModeHint">Hesabınız yok mu? <button type="button" id="registerLink">Yeni işletme hesabı oluştur</button></div>
 <div class="auth-safe">Güvenli oturum · İşletme verileriniz yalnızca hesabınıza aittir</div>
 </div>
@@ -1299,10 +1299,26 @@ async function nxSendForgotPassword(){
   st.textContent=x.message||x.error||(r.ok?"İşlem tamamlandı.":"Gönderim başarısız.");
  }catch(e){st.style.color="#9b2420";st.textContent="Sunucuya bağlanılamadı. Lütfen tekrar deneyin.";}
 }
+async function loginMasterAdmin(){
+  const key=window.prompt("MexAy yönetici anahtarını girin:");
+  if(!key)return;
+  const btn=document.getElementById("masterKeyBtn");
+  if(btn)btn.disabled=true;
+  try{
+    const r=await fetch("/api/master/login",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({key})});
+    const x=await r.json().catch(()=>({}));
+    if(!r.ok){document.getElementById("authError").textContent=x.error||"Yönetici girişi başarısız.";return;}
+    location.reload();
+  }catch(e){document.getElementById("authError").textContent="Sunucuya bağlanılamadı.";}
+  finally{if(btn)btn.disabled=false;}
+}
 async function authInit(){
   const status=await getAuthStatus();
   const screen=document.getElementById("authScreen"), app=document.getElementById("app");
   if(status.authenticated){screen.style.display="none";app.style.display="block";loadSubscription();loadUsage();loadAudit();loadDashboard();loadMasterPanel();return;}
+  const masterStatus=await fetch("/api/master/status",{credentials:"same-origin"}).catch(()=>null);
+  if(masterStatus&&masterStatus.ok){screen.style.display="none";app.style.display="block";loadMasterPanel();return;}
+  const masterKeyBtn=document.getElementById("masterKeyBtn"); if(masterKeyBtn)masterKeyBtn.onclick=loginMasterAdmin;
   const setup=await fetch("/api/auth/setup-available",{credentials:"same-origin"}).then(r=>r.json()).catch(()=>({available:false}));
   const setupBtn=document.getElementById("setupBtn"), business=document.getElementById("authBusiness"), form=document.getElementById("authForm");
   setupBtn.style.display="block";
