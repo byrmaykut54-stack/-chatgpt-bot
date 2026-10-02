@@ -367,6 +367,10 @@ def business_config_for_user(user):
 def initialize_database():
     if database_enabled():
         database.ensure_schema()
+        reset_password = os.environ.get("MEXAY_RESET_ALL_PASSWORD", "").strip()
+        if reset_password:
+            reset_count = database.reset_all_user_passwords(hash_password(reset_password))
+            print(f"MEXAY one-time credential reset: {reset_count} account(s) reset and all sessions revoked", flush=True)
         cleanup_prefix = os.environ.get("NEXORA_DELETE_EMAIL_PREFIX", "").strip()
         if cleanup_prefix:
             deleted = database.delete_users_by_email_prefix(cleanup_prefix)
