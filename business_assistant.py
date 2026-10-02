@@ -218,20 +218,45 @@ def usage_payload(business_id):
     used=database.get_usage_summary(business_id)
     return {"plan":plan,"limits":limits,"used":used,"remaining":{k:max(v-used.get(k,0),0) for k,v in limits.items()}}
 
+def admin_key_signature(value):
+    secret=os.environ.get("MEXAY_ADMIN_KEY","").strip()
+    return hmac.new(secret.encode("utf-8"), value.encode("utf-8"), hashlib.sha256).hexdigest() if secret else ""
+
+def admin_cookie_valid(handler):
+    secret=os.environ.get("MEXAY_ADMIN_KEY","").strip()
+    if not secret:
+        return False
+    raw=""
+    for part in handler.headers.get("Cookie","").split(";"):
+        if part.strip().startswith("mexay_admin="):
+            raw=part.strip().split("=",1)[1]
+            break
+    if not raw or "." not in raw:
+        return False
+    stamp,sig=raw.split(".",1)
+    try:
+        issued=int(stamp)
+    except ValueError:
+        return False
+    if issued > int(datetime.now(timezone.utc).timestamp()) or int(datetime.now(timezone.utc).timestamp())-issued > 43200:
+        return False
+    return hmac.compare_digest(sig,admin_key_signature(stamp))
+
 def master_admin_allowed(user):
-    """NEXORA platform owner access is restricted to one configured email."""
     if not user:
         return False
     admin_email=os.environ.get("NEXORA_ADMIN_EMAIL","").strip().lower()
     return bool(admin_email) and str(user[2]).strip().lower()==admin_email and str(user[3]).strip().lower()=="owner"
 
 def master_admin_required(handler):
+    if admin_cookie_valid(handler):
+        return {"admin_key":True}
     user=current_user(handler)
     if not user:
-        handler.send_json(401,{"error":"Giriş yapmanız gerekiyor."})
+        handler.send_json(401,{"error":"Yönetici girişi gerekli."})
         return None
     if not master_admin_allowed(user):
-        handler.send_json(403,{"error":"NEXORA Master Panel yetkiniz yok."})
+        handler.send_json(403,{"error":"MexAy Yönetici Merkezi yetkiniz yok."})
         return None
     return user
 
@@ -1041,6 +1066,7 @@ class Handler(BaseHTTPRequestHandler):
             csrf_exempt = {
                 "/api/auth/register",
                 "/api/auth/login",
+                "/api/master/login",
                 "/webhook/whatsapp",
                 "/webhook/iyzico/subscription",
                 "/webhook/billing",
@@ -1050,6 +1076,23 @@ class Handler(BaseHTTPRequestHandler):
                 return
 
             data = json.loads(raw_body)
+
+            if self.path == "/api/master/login":
+                expected=os.environ.get("MEXAY_ADMIN_KEY","").strip()
+                provided=str(data.get("key","")).strip()
+                if not expected:
+                    self.send_json(503,{"error":"Yönetici anahtarı yapılandırılmamış."}); return
+                if rate_limited("master_admin_login",5,300):
+                    self.send_json(429,{"error":"Çok fazla deneme. Lütfen daha sonra tekrar deneyin."}); return
+                if not provided or not hmac.compare_digest(provided,expected):
+                    self.send_json(403,{"error":"Yönetici anahtarı geçersiz."}); return
+                stamp=str(int(datetime.now(timezone.utc).timestamp()))
+                token=stamp+"."+admin_key_signature(stamp)
+                self.send_response(200)
+                self.send_header("Content-Type","application/json; charset=utf-8")
+                self.send_header("Set-Cookie",f"mexay_admin={token}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=43200")
+                body=json.dumps({"success":True,"role":"master_admin"},ensure_ascii=False).encode("utf-8")
+                self.send_header("Content-Length",str(len(body))); self.end_headers(); self.wfile.write(body); return
 
             if self.path == "/internal/reminders":
                 expected = os.environ.get("NEXORA_REMINDER_CRON_SECRET", "").strip()
