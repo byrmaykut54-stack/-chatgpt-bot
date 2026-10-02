@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="MexAy">
 <rect width="512" height="512" rx="112" fill="#0F1B3D"/>
-<circle cx="256" cy="256" r="184" fill="#0F1B3D"/>
-<text x="256" y="335" text-anchor="middle" font-family="Poppins,Inter,Arial,sans-serif" font-size="246" font-weight="700" fill="#FF6B35">x</text>
-<path d="M392 88c-48 10-82 53-82 102 0 57 46 103 103 103 21 0 41-6 57-17-21 39-62 65-109 65-69 0-125-56-125-125S292 91 361 91c11 0 21 1 31 4z" fill="#F5C451"/>
+<text x="174" y="348" text-anchor="middle" font-family="Poppins,Inter,Arial,sans-serif" font-size="260" font-weight="700" fill="#F7F8FC">N</text>
+<text x="342" y="358" text-anchor="middle" font-family="Poppins,Inter,Arial,sans-serif" font-size="230" font-weight="800" fill="#FF6B35">x</text>
+<path d="M395 86c-42 9-73 47-73 91 0 51 41 92 92 92 18 0 35-5 49-14-19 34-55 57-96 57-61 0-110-49-110-110S306 92 367 92c10 0 19 1 28 4z" fill="#F5C451"/>
 </svg>
