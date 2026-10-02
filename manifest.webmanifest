@@ -1,12 +1,12 @@
 {
-  "name": "NEXORA",
-  "short_name": "NEXORA",
+  "name": "MexAy",
+  "short_name": "MexAy",
   "description": "Premium işletme ve randevu yönetim platformu",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#f4f6f8",
-  "theme_color": "#17202a",
+  "background_color": "#F7F8FC",
+  "theme_color": "#0F1B3D",
   "lang": "tr",
   "icons": [
     {"src": "./app-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable"}
