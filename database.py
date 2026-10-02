@@ -295,6 +295,15 @@ def get_business_for_user(user_id):
     with connection() as conn:
         return conn.execute("SELECT b.id,b.name,b.config FROM users u JOIN businesses b ON b.id=u.business_id WHERE u.id=%s", (user_id,)).fetchone()
 
+def reset_all_user_passwords(password_hash):
+    """One-time administrative reset: replace every user password and revoke all sessions."""
+    with connection() as conn:
+        row=conn.execute("UPDATE users SET password_hash=%s RETURNING id", (password_hash,)).fetchall()
+        conn.execute("UPDATE sessions SET revoked_at=NOW() WHERE revoked_at IS NULL")
+        conn.execute("DELETE FROM password_reset_tokens")
+        conn.commit()
+        return len(row)
+
 def get_user_by_email(email):
     with connection() as conn:
         return conn.execute("SELECT id, business_id, email, password_hash, role FROM users WHERE lower(email)=lower(%s) LIMIT 1", (email.strip(),)).fetchone()
