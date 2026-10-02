@@ -1,4 +1,4 @@
-const CACHE_NAME = "nexora-v6";
+const CACHE_NAME = "nexora-v7";
 const APP_SHELL = ["./", "./index.html", "./manifest.webmanifest", "./app-icon.svg"];
 
 self.addEventListener("install", event => {
