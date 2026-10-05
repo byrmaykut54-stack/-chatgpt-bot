@@ -7,6 +7,23 @@ import business_assistant
 
 
 class BusinessAssistantTests(unittest.TestCase):
+    def test_gemini_model_is_configurable(self):
+        import json
+        class Response:
+            def __enter__(self): return self
+            def __exit__(self, *args): pass
+            def read(self): return json.dumps({'candidates':[{'content':{'parts':[{'text':'ok'}]}}]}).encode()
+        with patch.dict(os.environ, {'GEMINI_API_KEY':'test-only','GEMINI_MODEL':'gemini-2.5-flash'}), patch.object(business_assistant.urllib.request,'urlopen',return_value=Response()) as call:
+            self.assertEqual(business_assistant.gemini_request('test'),'ok')
+            self.assertIn('/models/gemini-2.5-flash:', call.call_args.args[0].full_url)
+
+    def test_calendar_connection_uses_only_events_permission(self):
+        import google_calendar
+        with patch.object(google_calendar.database,'consume_google_oauth_state',return_value={'business_id':1,'user_id':2}), patch.object(google_calendar,'exchange_code',return_value={'access_token':'test-only-access','refresh_token':'test-only-refresh'}), patch.object(google_calendar.database,'save_google_calendar_connection') as save, patch.object(google_calendar,'_api') as metadata:
+            self.assertEqual(google_calendar.connect_from_callback('state','code'),1)
+            metadata.assert_not_called()
+            self.assertEqual(save.call_args.args[2],'primary')
+
     def test_default_config_has_required_fields(self):
         config = business_assistant.load_config()
         self.assertIn("business_name", config)
@@ -31,7 +48,7 @@ class BusinessAssistantTests(unittest.TestCase):
             path = os.path.join(tmp, "appointments.json")
             data = {
                 "customer_name": "Ali", "phone": "05550000000",
-                "date": "2026-10-01", "time": "14:00", "service": "Saç Kesimi"
+                "date": "2099-10-05", "time": "14:00", "service": "Saç Kesimi"
             }
             with patch.object(business_assistant, "APPOINTMENTS_PATH", path):
                 first, error1 = business_assistant.create_appointment(data)

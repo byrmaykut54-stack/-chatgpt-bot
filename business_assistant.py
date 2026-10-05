@@ -95,7 +95,7 @@ def verify_password(password, stored):
 def send_email(to_address, subject, body):
     """Send transactional mail via Resend, with SMTP fallback when configured."""
     resend_key=os.environ.get("RESEND_API_KEY","").strip()
-    resend_from=os.environ.get("RESEND_FROM","").strip()
+    resend_from=(os.environ.get("RESEND_FROM") or os.environ.get("RESEND_FROM_EMAIL", "")).strip()
     if resend_key and resend_from:
         try:
             payload=json.dumps({"from":resend_from,"to":[to_address],"subject":subject,"text":body}).encode("utf-8")
@@ -392,14 +392,7 @@ def business_config_for_user(user):
 def initialize_database():
     if database_enabled():
         database.ensure_schema()
-        reset_password = os.environ.get("MEXAY_RESET_ALL_PASSWORD", "").strip()
-        if reset_password:
-            reset_count = database.reset_all_user_passwords(hash_password(reset_password))
-            print(f"MEXAY one-time credential reset: {reset_count} account(s) reset and all sessions revoked", flush=True)
-        cleanup_prefix = os.environ.get("NEXORA_DELETE_EMAIL_PREFIX", "").strip()
-        if cleanup_prefix:
-            deleted = database.delete_users_by_email_prefix(cleanup_prefix)
-            print(f"NEXORA one-time account cleanup: {deleted} account(s) removed for prefix {cleanup_prefix}")
+        # Startup must never repeat an old account cleanup or password reset.
         config = load_config()
         business_id = database.get_business_id(config)
         legacy_appointments = load_json(APPOINTMENTS_PATH, [])
@@ -447,8 +440,11 @@ def gemini_request(prompt, max_tokens=1000):
     if not api_key:
         raise RuntimeError("GEMINI_API_KEY tanımlı değil.")
     payload = {"contents": [{"parts": [{"text": prompt}]}], "generationConfig": {"maxOutputTokens": max_tokens}}
+    model = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash").strip()
+    if not re.fullmatch(r"[a-zA-Z0-9._-]+", model):
+        raise RuntimeError("GEMINI_MODEL değeri geçersiz.")
     req = urllib.request.Request(
-        "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent",
+        f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
         data=json.dumps(payload).encode("utf-8"),
         headers={"x-goog-api-key": api_key, "Content-Type": "application/json"},
         method="POST"
@@ -895,6 +891,14 @@ class Handler(BaseHTTPRequestHandler):
                     error_type=type(exc).__name__
             self.send_json(200,{"database_configured":configured,"database_reachable":reachable,"error_type":error_type})
             return
+        if parsed.path == "/api/capabilities":
+            email_ready = bool((os.environ.get("RESEND_API_KEY") and (os.environ.get("RESEND_FROM") or os.environ.get("RESEND_FROM_EMAIL"))) or
+                               (os.environ.get("SMTP_HOST") and (os.environ.get("SMTP_FROM") or os.environ.get("SMTP_USERNAME"))))
+            self.send_json(200, {"email_configured": email_ready,
+                "ai_configured": bool(os.environ.get("GEMINI_API_KEY")),
+                "calendar_configured": bool(google_calendar and google_calendar.configured()),
+                "payments_configured": bool(os.environ.get("IYZICO_API_KEY") and os.environ.get("IYZICO_SECRET_KEY"))})
+            return
         if parsed.path == "/api/auth/status":
             user=current_user(self)
             payload={"authenticated":bool(user),"email":user[2] if user else ""}
@@ -1022,13 +1026,14 @@ class Handler(BaseHTTPRequestHandler):
             db_ok = False
             if database_enabled():
                 try:
-                    database.ensure_schema()
+                    with database.connection() as conn:
+                        conn.execute("SELECT 1").fetchone()
                     db_ok = True
                 except Exception:
                     db_ok = False
-            self.send_json(200, {
+            self.send_json(200 if db_ok else 503, {
                 "status": "ok" if db_ok else "degraded",
-                "service": "NEXORA",
+                "service": "MexAy Business OS",
                 "database": "ok" if db_ok else "unavailable"
             }); return
         self.send_json(404, {"error": "Not found"})
@@ -1075,7 +1080,12 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(403, {"error": "İstek kaynağı doğrulanamadı."})
                 return
 
-            data = json.loads(raw_body)
+            try:
+                data = json.loads(raw_body)
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                self.send_json(400, {"error": "Geçerli bir JSON gövdesi gerekli."}); return
+            if not isinstance(data, dict):
+                self.send_json(400, {"error": "JSON gövdesi bir nesne olmalı."}); return
 
             if self.path == "/api/master/login":
                 expected=os.environ.get("MEXAY_ADMIN_KEY","").strip()
@@ -1262,17 +1272,20 @@ class Handler(BaseHTTPRequestHandler):
                 email=str(data.get("email","")).strip().lower()
                 if len(email)>254 or not email or "@" not in email:
                     self.send_json(200,{"success":True,"message":"Eğer hesap varsa sıfırlama bağlantısı e-posta adresinize gönderildi."}); return
+                if rate_limited("forgot:" + email, 3, 300):
+                    self.send_json(429, {"error": "Çok fazla istek. Lütfen birkaç dakika sonra tekrar deneyin."}); return
+                base=frontend_base_url()
+                if not base:
+                    self.send_json(503,{"error":"MexAy uygulama adresi yapılandırılmamış."}); return
                 user=database.get_user_by_email(email) if database_enabled() else None
                 if user:
                     token,token_hash=make_one_time_token()
                     database.create_password_reset_token(token_hash,user[0],datetime.now(timezone.utc)+timedelta(minutes=30))
-                    base=frontend_base_url()
                     if base:
-                        if not send_email(user[2],"NEXORA şifre sıfırlama",f"NEXORA şifrenizi yenilemek için bağlantı:\n{base}/?reset_token={token}\n\nBağlantı 30 dakika geçerlidir."):
+                        if not send_email(user[2],"MexAy şifre sıfırlama",f"MexAy şifrenizi yenilemek için bağlantı:\n{base}/?reset_token={token}\n\nBağlantı 30 dakika geçerlidir."):
+                            database.discard_password_reset_token(token_hash)
                             print("PASSWORD_RESET_EMAIL_FAILED: SMTP/Resend yapılandırması veya gönderim başarısız.", flush=True)
                             self.send_json(503,{"error":"Şifre sıfırlama e-postası şu anda gönderilemedi. E-posta gönderici yapılandırmasını kontrol edin."}); return
-                elif user and not base:
-                    self.send_json(503,{"error":"NEXORA uygulama adresi yapılandırılmamış."}); return
                 self.send_json(200,{"success":True,"message":"Eğer hesap varsa sıfırlama bağlantısı e-posta adresinize gönderildi."}); return
 
             if self.path == "/api/auth/reset-password":
@@ -1280,10 +1293,9 @@ class Handler(BaseHTTPRequestHandler):
                 password=str(data.get("password",""))
                 if len(token)<40 or len(password)<8 or len(password)>128:
                     self.send_json(400,{"error":"Geçersiz sıfırlama bilgisi."}); return
-                user_id=database.consume_password_reset_token(hashlib.sha256(token.encode("utf-8")).hexdigest()) if database_enabled() else None
+                user_id=database.reset_password_with_token(hashlib.sha256(token.encode("utf-8")).hexdigest(), hash_password(password)) if database_enabled() else None
                 if not user_id:
                     self.send_json(400,{"error":"Sıfırlama bağlantısı geçersiz veya süresi dolmuş."}); return
-                database.set_user_password(user_id,hash_password(password))
                 self.send_json(200,{"success":True,"message":"Şifreniz güncellendi. Yeni şifrenizle giriş yapabilirsiniz."}); return
 
             if self.path == "/api/auth/verify-email":
@@ -1311,14 +1323,16 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_json(409,{"error":"Bu e-posta zaten kayıtlı. Giriş yapmayı deneyin."}); return
                 config=dict(DEFAULT_CONFIG)
                 config["business_name"]=business_name
-                business_id=database.create_business(business_name,config)
-                user_id=database.create_user(email,hash_password(password),business_id,"owner")
+                try:
+                    business_id,user_id=database.register_business_owner(business_name,config,email,hash_password(password))
+                except database.psycopg.errors.UniqueViolation:
+                    self.send_json(409,{"error":"Bu e-posta zaten kayıtlı. Giriş yapmayı deneyin."}); return
                 verification_token,verification_hash=make_one_time_token()
                 database.create_email_verification_token(verification_hash,user_id,datetime.now(timezone.utc)+timedelta(hours=24))
                 base=frontend_base_url()
                 if base:
                     try:
-                        send_email(email,"NEXORA e-posta doğrulama",f"NEXORA hesabınızı doğrulamak için bağlantı:\n{base}/?verify_token={verification_token}\n\nBağlantı 24 saat geçerlidir.")
+                        send_email(email,"MexAy e-posta doğrulama",f"MexAy hesabınızı doğrulamak için bağlantı:\n{base}/?verify_token={verification_token}\n\nBağlantı 24 saat geçerlidir.")
                     except Exception:
                         pass
                 token=os.urandom(32).hex()
@@ -1564,11 +1578,11 @@ class Handler(BaseHTTPRequestHandler):
 
             self.send_json(404,{"error":"Not found"})
         except Exception as exc:
-            self.send_json(500,{"error":str(exc)})
+            print(f"REQUEST_ERROR: {type(exc).__name__}", flush=True)
+            self.send_json(500,{"error":"İşlem şu anda tamamlanamadı. Lütfen tekrar deneyin."})
 
 if __name__ == "__main__":
     initialize_database()
     port=int(os.environ.get("PORT","8080"))
     print(f"AI İşletme Asistanı: http://0.0.0.0:{port}")
     HTTPServer(("0.0.0.0",port),Handler).serve_forever()
-

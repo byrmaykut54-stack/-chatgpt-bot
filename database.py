@@ -177,7 +177,7 @@ ON audit_logs (business_id, created_at DESC);
 def connection():
     if not DATABASE_URL or psycopg is None:
         raise RuntimeError("DATABASE_URL veya psycopg kullanılamıyor.")
-    with psycopg.connect(DATABASE_URL) as conn:
+    with psycopg.connect(DATABASE_URL, connect_timeout=10) as conn:
         yield conn
 
 def enabled():
@@ -317,6 +317,32 @@ def create_user(email, password_hash, business_id, role="owner"):
         row = conn.execute("INSERT INTO users (business_id,email,password_hash,role,permissions) VALUES (%s,%s,%s,%s,%s) RETURNING id", (business_id, email.strip().lower(), password_hash, role, psycopg.types.json.Json({"appointments":True,"customers":True,"messages":True,"business_settings":role=="owner","team":role=="owner","reports":True}))).fetchone()
         conn.commit()
         return row[0]
+
+def register_business_owner(name, config, email, password_hash):
+    """Create an owner and business atomically; duplicate email leaves no orphan."""
+    with connection() as conn:
+        business_id = conn.execute("INSERT INTO businesses(name,config,plan,status,trial_ends_at) VALUES(%s,%s,'trial','active',NOW()+INTERVAL '14 days') RETURNING id",
+                                  (name, psycopg.types.json.Json(config))).fetchone()[0]
+        permissions = {"appointments": True, "customers": True, "messages": True, "business_settings": True, "team": True, "reports": True}
+        user_id = conn.execute("INSERT INTO users(business_id,email,password_hash,role,permissions) VALUES(%s,%s,%s,'owner',%s) RETURNING id",
+                               (business_id, email.strip().lower(), password_hash, psycopg.types.json.Json(permissions))).fetchone()[0]
+        return business_id, user_id
+
+def discard_password_reset_token(token_hash):
+    with connection() as conn:
+        conn.execute("DELETE FROM password_reset_tokens WHERE token_hash=%s", (token_hash,))
+
+def reset_password_with_token(token_hash, password_hash):
+    """Consume recovery token, update password and revoke sessions in one commit."""
+    with connection() as conn:
+        row = conn.execute("SELECT user_id FROM password_reset_tokens WHERE token_hash=%s AND used_at IS NULL AND expires_at>NOW() FOR UPDATE", (token_hash,)).fetchone()
+        if not row:
+            return None
+        user_id = row[0]
+        conn.execute("UPDATE users SET password_hash=%s WHERE id=%s", (password_hash, user_id))
+        conn.execute("UPDATE password_reset_tokens SET used_at=NOW() WHERE user_id=%s", (user_id,))
+        conn.execute("UPDATE sessions SET revoked_at=NOW() WHERE user_id=%s AND revoked_at IS NULL", (user_id,))
+        return user_id
 
 def create_password_reset_token(token_hash, user_id, expires_at):
     with connection() as conn:

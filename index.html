@@ -874,7 +874,21 @@ td{border-bottom-color:#222!important;color:#ddd!important}
 </section>
 
 <section class="nx-page" data-nx-page="audit"><div class="nx-audit-shell"><div class="nx-audit-hero"><div><div class="nx-hero-kicker">GÜVENLİK & DENETİM</div><h3>İşletmenizde ne olduğunu bilin.</h3><p>Önemli hesap ve işletme işlemlerinin güvenlik kayıtlarını inceleyin.</p></div><div class="nx-audit-badge">AUDIT LOG</div></div><div class="card nx-audit-card"><div class="nx-audit-head"><div><span>SON İŞLEMLER</span><h4>Denetim kayıtları</h4></div><div class="nx-audit-shield">🛡</div></div><div id="auditLogs" class="nx-audit-list muted">Kayıtlar yükleniyor...</div></div></div></section>
-</div><script>
+</div>
+<div id="nxAppointmentModal" class="nx-modal-backdrop" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="nxModalTitle">
+ <div class="nx-modal" role="document">
+  <div class="nx-modal-head"><div><div class="nx-modal-kicker">RANDEVU DETAYI</div><h2 id="nxModalTitle" class="nx-modal-title">Randevu</h2></div><button id="nxModalClose" type="button" class="nx-modal-close" aria-label="Kapat">×</button></div>
+  <div class="nx-modal-body"><div class="nx-detail-grid">
+   <div class="nx-detail-card"><span>Müşteri</span><strong id="nxModalCustomer"></strong></div>
+   <div class="nx-detail-card"><span>Telefon</span><strong id="nxModalPhone"></strong></div>
+   <div class="nx-detail-card"><span>Tarih</span><strong id="nxModalDate"></strong></div>
+   <div class="nx-detail-card"><span>Saat</span><strong id="nxModalTime"></strong></div>
+   <div class="nx-detail-card nx-detail-service"><span>Hizmet</span><strong id="nxModalService"></strong></div>
+   <div class="nx-detail-card"><span>Durum</span><div id="nxModalStatus"></div></div>
+  </div><div id="nxModalActions" class="nx-modal-actions"></div></div>
+ </div>
+</div>
+<script>
 function localDateISO(){const d=new Date();const y=d.getFullYear();const m=String(d.getMonth()+1).padStart(2,"0");const day=String(d.getDate()).padStart(2,"0");return y+"-"+m+"-"+day}
 const today=localDateISO();
 document.getElementById("todayLabel").textContent=new Date().toLocaleDateString("tr-TR",{weekday:"long",year:"numeric",month:"long",day:"numeric"});
@@ -896,7 +910,7 @@ function actionButtons(x){
  if(x.status==="confirmed")return '<div class="nx-row-actions"><button class="approve" onclick="setStatus(\''+id+'\',\'completed\')">✓ Tamamlandı</button><button class="cancel" onclick="setStatus(\''+id+'\',\'cancelled\')">✕ İptal</button></div>';
  return "";
 }
-function appointmentTable(items){if(!items.length)return '<div class="muted">Randevu bulunmuyor.</div>';return '<div class="scroll"><table><tr><th>Müşteri</th><th>Saat</th><th>Hizmet</th><th>Durum</th><th>İşlem</th></tr>'+items.map(x=>'<tr><td><button type="button" class="nx-table-link" onclick="nxOpenAppointmentDetail(\\''+escapeHtml(x.id)+'\\')">'+escapeHtml(x.customer_name)+'</button></td><td>'+escapeHtml(x.time)+'</td><td>'+escapeHtml(x.service)+'</td><td>'+badge(x.status)+'</td><td>'+actionButtons(x)+'</td></tr>').join("")+"</table></div>";}
+function appointmentTable(items){if(!items.length)return '<div class="muted">Randevu bulunmuyor.</div>';return '<div class="scroll"><table><tr><th>Müşteri</th><th>Saat</th><th>Hizmet</th><th>Durum</th><th>İşlem</th></tr>'+items.map(x=>'<tr><td><button type="button" class="nx-table-link" onclick="nxOpenAppointmentDetail(\''+escapeHtml(x.id)+'\')">'+escapeHtml(x.customer_name)+'</button></td><td>'+escapeHtml(x.time)+'</td><td>'+escapeHtml(x.service)+'</td><td>'+badge(x.status)+'</td><td>'+actionButtons(x)+'</td></tr>').join("")+"</table></div>";}
 async function loadUsage(){
  const r=await fetch("/api/usage"); if(!r.ok)return;
  const u=await r.json(); const el=document.getElementById("usageInfo"); const el2=document.getElementById("nxUsageInfo"); if(!el&&!el2)return;
@@ -1069,10 +1083,10 @@ window.nxOpenAppointmentDetail=function(id){
  document.getElementById("nxModalStatus").innerHTML=badge(x.status);
  const actions=document.getElementById("nxModalActions"), safeId=escapeHtml(x.id);
  actions.innerHTML=(x.status==="pending"
-   ? '<button type="button" class="approve" onclick="nxModalSetStatus(\\''+safeId+'\\',\\'confirmed\\')">✓ Onayla</button><button type="button" class="cancel" onclick="nxModalSetStatus(\\''+safeId+'\\',\\'cancelled\\')">✕ İptal</button>'
+   ? '<button type="button" class="approve" onclick="nxModalSetStatus(\''+safeId+'\',\'confirmed\')">✓ Onayla</button><button type="button" class="cancel" onclick="nxModalSetStatus(\''+safeId+'\',\'cancelled\')">✕ İptal</button>'
    : x.status==="confirmed"
-     ? '<button type="button" class="approve" onclick="nxModalSetStatus(\\''+safeId+'\\',\\'completed\\')">✓ Tamamlandı</button><button type="button" class="cancel" onclick="nxModalSetStatus(\\''+safeId+'\\',\\'cancelled\\')">✕ İptal</button>'
-     : '')+'<button type="button" class="nx-command-secondary nx-modal-wide" onclick="nxSetPage(\\'appointments\\');nxCloseAppointmentModal()">Randevu merkezine geç →</button>';
+     ? '<button type="button" class="approve" onclick="nxModalSetStatus(\''+safeId+'\',\'completed\')">✓ Tamamlandı</button><button type="button" class="cancel" onclick="nxModalSetStatus(\''+safeId+'\',\'cancelled\')">✕ İptal</button>'
+     : '')+'<button type="button" class="nx-command-secondary nx-modal-wide" onclick="nxSetPage(\'appointments\');nxCloseAppointmentModal()">Randevu merkezine geç →</button>';
  modal.classList.add("is-open");modal.setAttribute("aria-hidden","false");document.body.classList.add("nx-modal-open");
 };
 window.nxCloseAppointmentModal=function(){const modal=document.getElementById("nxAppointmentModal");if(!modal)return;modal.classList.remove("is-open");modal.setAttribute("aria-hidden","true");document.body.classList.remove("nx-modal-open");};

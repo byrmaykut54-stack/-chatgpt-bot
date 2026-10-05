@@ -16,7 +16,8 @@ def configured():
     return bool(os.environ.get("GOOGLE_CLIENT_ID","").strip() and os.environ.get("GOOGLE_CLIENT_SECRET","").strip())
 
 def redirect_uri():
-    return os.environ.get("GOOGLE_REDIRECT_URI","").strip() or ((os.environ.get("PUBLIC_APP_URL","").strip().rstrip("/") or "")+"/oauth/google/callback")
+    base = os.environ.get("PUBLIC_APP_URL", "https://ai-isletme-asistani-1s10.onrender.com").strip().rstrip("/")
+    return os.environ.get("GOOGLE_REDIRECT_URI","").strip() or (base+"/oauth/google/callback")
 
 def authorization_url(business_id,user_id):
     if not configured(): raise RuntimeError("Google Calendar OAuth yapılandırılmalı.")
@@ -66,8 +67,9 @@ def connect_from_callback(state,code):
     if not access: raise RuntimeError("Google erişim tokenı alınamadı.")
     if not refresh: refresh=(database.get_google_calendar_connection(oauth["business_id"]) or {}).get("refresh_token","")
     if not refresh: raise RuntimeError("Google refresh token alınamadı. Bağlantıyı yeniden yetkilendirin.")
-    info=_api("GET","/users/me/calendarList/primary",access)
-    database.save_google_calendar_connection(oauth["business_id"],oauth["user_id"],info.get("id","primary"),info.get("summaryOverride") or info.get("summary") or "Google Calendar",access,refresh,datetime.now(timezone.utc)+timedelta(seconds=int(t.get("expires_in",3600))),t.get("scope",""))
+    # The events scope can write to 'primary' but does not authorize CalendarList.
+    # Avoid a metadata call that prevented otherwise valid connections.
+    database.save_google_calendar_connection(oauth["business_id"],oauth["user_id"],"primary","Google Calendar",access,refresh,datetime.now(timezone.utc)+timedelta(seconds=int(t.get("expires_in",3600))),t.get("scope",""))
     return oauth["business_id"]
 
 def status(business_id):
