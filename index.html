@@ -895,14 +895,17 @@ document.getElementById("todayLabel").textContent=new Date().toLocaleDateString(
 function escapeHtml(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[c]));}
 function badge(status){const l={pending:"Bekliyor",confirmed:"Onaylandı",cancelled:"İptal",completed:"Tamamlandı"}[status]||status;return '<span class="badge '+escapeHtml(status)+'">'+escapeHtml(l)+"</span>";}
 async function setStatus(id,status){
+ try{
  const r=await fetch("/api/appointments/status",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({id,status})});
- if(!r.ok){const x=await r.json().catch(()=>({}));alert(x.error||"Durum güncellenemedi.");return}
+ if(!r.ok){const x=await r.json().catch(()=>({}));alert(x.error||"Durum güncellenemedi.");return false}
  const labels={confirmed:"Randevu onaylandı",cancelled:"Randevu iptal edildi",completed:"Randevu tamamlandı"};
  if("Notification" in window){
    if(Notification.permission==="default")try{await Notification.requestPermission();}catch(e){}
    if(Notification.permission==="granted"&&labels[status])try{new Notification(labels[status],{body:"MexAy randevu durumu güncellendi."});}catch(e){}
  }
- loadDashboard();
+ await loadDashboard();
+ return true;
+ }catch(e){alert("Sunucuya bağlanılamadı. Lütfen tekrar deneyin.");return false;}
 }
 function actionButtons(x){
  const id=escapeHtml(x.id);
@@ -985,11 +988,11 @@ function nxNotificationItems(items){
   const list=Array.isArray(items)?items:[];
   const active=list.filter(x=>x.status!=="cancelled");
   const pending=active.filter(x=>x.status==="pending").sort((a,b)=>String(a.date+a.time).localeCompare(String(b.date+b.time)));
-  const today=active.filter(x=>x.date===today).sort((a,b)=>String(a.time).localeCompare(String(b.time)));
+  const todayAppointments=active.filter(x=>x.date===today).sort((a,b)=>String(a.time).localeCompare(String(b.time)));
   const upcoming=active.filter(x=>x.date>today).sort((a,b)=>String(a.date+a.time).localeCompare(String(b.date+b.time)));
   const out=[];
   pending.slice(0,5).forEach(x=>out.push({key:"pending-"+x.id,icon:"!",title:"Onay bekleyen randevu",body:(x.customer_name||"Müşteri")+" • "+nxNotificationTime(x),id:x.id}));
-  today.slice(0,5).forEach(x=>{if(x.status!=="pending")out.push({key:"today-"+x.id,icon:"•",title:"Bugünkü randevu",body:(x.customer_name||"Müşteri")+" • "+nxNotificationTime(x),id:x.id});});
+  todayAppointments.slice(0,5).forEach(x=>{if(x.status!=="pending")out.push({key:"today-"+x.id,icon:"•",title:"Bugünkü randevu",body:(x.customer_name||"Müşteri")+" • "+nxNotificationTime(x),id:x.id});});
   upcoming.slice(0,3).forEach(x=>out.push({key:"upcoming-"+x.id,icon:"→",title:"Yaklaşan randevu",body:(x.customer_name||"Müşteri")+" • "+nxNotificationTime(x),id:x.id}));
   return out.slice(0,10);
 }
@@ -1090,7 +1093,13 @@ window.nxOpenAppointmentDetail=function(id){
  modal.classList.add("is-open");modal.setAttribute("aria-hidden","false");document.body.classList.add("nx-modal-open");
 };
 window.nxCloseAppointmentModal=function(){const modal=document.getElementById("nxAppointmentModal");if(!modal)return;modal.classList.remove("is-open");modal.setAttribute("aria-hidden","true");document.body.classList.remove("nx-modal-open");};
-window.nxModalSetStatus=async function(id,status){await setStatus(id,status);nxCloseAppointmentModal();};
+window.nxModalSetStatus=async function(id,status){
+ const actions=document.getElementById("nxModalActions");
+ if(actions?.dataset.busy==="true")return;
+ if(actions){actions.dataset.busy="true";actions.querySelectorAll("button").forEach(b=>b.disabled=true);}
+ try{if(await setStatus(id,status))nxCloseAppointmentModal();}
+ finally{if(actions){delete actions.dataset.busy;actions.querySelectorAll("button").forEach(b=>b.disabled=false);}}
+};
 function nxMoveAppointmentDay(delta){
   const d=new Date((document.getElementById("nxApptDate")?.value||nxAppointmentCenterDate)+"T12:00:00");
   d.setDate(d.getDate()+delta);
@@ -1452,3 +1461,4 @@ document.getElementById("teamForm").addEventListener("submit",async e=>{
 /* MexAy brand overrides */
 .mx-brand,.auth-name,.top h1{font-family:Poppins,Inter,sans-serif}
 </style>
+
