@@ -41,7 +41,10 @@ def _api(method,path,token,payload=None):
     h={"Authorization":"Bearer "+token,"Accept":"application/json"}
     if payload is not None: h["Content-Type"]="application/json"
     req=urllib.request.Request(CALENDAR_API+path,data=data,headers=h,method=method)
-    with urllib.request.urlopen(req,timeout=30) as r: return json.load(r)
+    with urllib.request.urlopen(req,timeout=30) as r:
+        raw = r.read()
+        # Successful event deletion has no response body.
+        return json.loads(raw) if raw else {}
 
 def access_token_for_business(business_id):
     c=database.get_google_calendar_connection(business_id)
@@ -108,3 +111,4 @@ def sync_all(business_id,appointments):
             r=sync_appointment(business_id,a); out.append({"id":a["id"],"ok":True,"event_id":r.get("id") if r else None})
         except Exception as e: out.append({"id":a["id"],"ok":False,"error":str(e)})
     return out
+
