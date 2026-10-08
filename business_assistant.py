@@ -869,7 +869,8 @@ class Handler(BaseHTTPRequestHandler):
         if parsed.path == "/api/master/status":
             user=master_admin_required(self)
             if not user: return
-            self.send_json(200,{"enabled":True,"email":user[2]}); return
+            email="" if isinstance(user,dict) and user.get("admin_key") else user[2]
+            self.send_json(200,{"enabled":True,"email":email}); return
         if parsed.path == "/api/master/stats":
             user=master_admin_required(self)
             if not user: return
@@ -1586,3 +1587,4 @@ if __name__ == "__main__":
     port=int(os.environ.get("PORT","8080"))
     print(f"AI İşletme Asistanı: http://0.0.0.0:{port}")
     HTTPServer(("0.0.0.0",port),Handler).serve_forever()
+

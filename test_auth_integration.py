@@ -82,6 +82,35 @@ class AuthIntegrationTests(unittest.TestCase):
         self.assertEqual(status,200)
         self.assertEqual(data['database'],'ok')
 
+    def test_admin_key_login_opens_panel_without_business_session(self):
+        with patch.dict(os.environ, {'MEXAY_ADMIN_KEY':'isolated-admin-key', 'NEXORA_ADMIN_EMAIL':''}):
+            self.assertEqual(self.request('/api/master/status', method='GET')[0], 401)
+            self.assertEqual(self.request('/api/master/login', {'key':'wrong-key'})[0], 403)
+            status, data, cookie = self.request('/api/master/login', {'key':'isolated-admin-key'})
+            self.assertEqual(status, 200)
+            self.assertTrue(data['success'])
+            self.assertTrue(cookie.startswith('mexay_admin='))
+            self.assertFalse(self.request('/api/auth/status', cookie=cookie, method='GET')[1]['authenticated'])
+            for _ in range(2):
+                status, data, _ = self.request('/api/master/status', cookie=cookie, method='GET')
+                self.assertEqual(status, 200)
+                self.assertTrue(data['enabled'])
+                self.assertEqual(data['email'], '')
+                self.assertEqual(self.request('/api/master/stats', cookie=cookie, method='GET')[0], 200)
+                self.assertEqual(self.request('/api/master/businesses', cookie=cookie, method='GET')[0], 200)
+            self.assertEqual(self.request('/api/master/status', cookie=cookie+'tampered', method='GET')[0], 401)
+            stamp = str(int(datetime.now(timezone.utc).timestamp())-43201)
+            expired = 'mexay_admin='+stamp+'.'+self.module.admin_key_signature(stamp)
+            self.assertEqual(self.request('/api/master/status', cookie=expired, method='GET')[0], 401)
+
+    def test_admin_email_status_preserves_owner_identity(self):
+        _, uid = self.owner('admin@example.com')
+        cookie = self.session(uid, 'admin-owner-session')
+        with patch.dict(os.environ, {'NEXORA_ADMIN_EMAIL':'admin@example.com'}):
+            status, data, _ = self.request('/api/master/status', cookie=cookie, method='GET')
+            self.assertEqual(status, 200)
+            self.assertEqual(data, {'enabled':True, 'email':'admin@example.com'})
+
     def test_duplicate_registration_rolls_back_business(self):
         self.db.register_business_owner('First',self.module.DEFAULT_CONFIG,'duplicate@example.com','hash')
         with self.assertRaises(self.db.psycopg.errors.UniqueViolation):
