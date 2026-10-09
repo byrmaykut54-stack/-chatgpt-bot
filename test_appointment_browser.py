@@ -32,6 +32,7 @@ class AppointmentBrowserTests(unittest.TestCase):
         self.items = []
         self.requests = []
         self.status_error = None
+        self.logout_error = None
         self.date = datetime.now(timezone(timedelta(hours=3))).strftime('%Y-%m-%d')
         self.items.append({'id':'a1','customer_name':'Ali','phone':'05550000000','date':self.date,
                            'time':'14:00','service':'Saç Kesimi','status':'pending'})
@@ -74,6 +75,9 @@ class AppointmentBrowserTests(unittest.TestCase):
             self.requests.append(data)
             body={**data,'id':'a2','status':'pending'}
             self.items.append(body); code=201
+        elif path == '/api/auth/logout':
+            code = self.logout_error or 200
+            body = {'error': 'Çıkış servisi kullanılamıyor.'} if self.logout_error else {'success': True}
         elif path == '/api/subscription': body={'plan':'trial','status':'active','trial_active':True}
         elif path == '/api/usage': body={'plan':'trial','limits':{},'used':{},'remaining':{}}
         elif path == '/api/calendar/status': body={'connected':False}
@@ -89,6 +93,27 @@ class AppointmentBrowserTests(unittest.TestCase):
         self.assertEqual(self.page.locator('#nxModalCustomer').inner_text(), 'Ali')
         self.assertEqual(self.page.locator('#nxModalPhone').inner_text(), '05550000000')
         self.assertEqual(self.page.locator('#nxModalTime').inner_text(), '14:00')
+
+    def test_every_navigation_button_opens_its_page_desktop_and_mobile(self):
+        for width in (1280, 390):
+            self.page.set_viewport_size({'width': width, 'height': 900})
+            for name in ('dashboard','appointments','customers','messages','team','settings','subscription','usage','audit','reports'):
+                with self.subTest(width=width, page=name):
+                    if self.page.locator('#nxMenuTrigger').is_visible():
+                        self.page.locator('#nxMenuTrigger').click()
+                    self.page.locator('#nexoraNav [data-page="'+name+'"]').click()
+                    self.assertTrue(self.page.locator('[data-nx-page="'+name+'"]').is_visible())
+                    self.assertEqual(self.page.locator('#nxMenuTrigger').get_attribute('aria-expanded'), 'false')
+                    self.assertLessEqual(self.page.evaluate('document.documentElement.scrollWidth'), width)
+
+    def test_failed_logout_preserves_page_and_restores_button(self):
+        self.logout_error = 503
+        label = self.page.locator('#logoutBtn').inner_text()
+        self.page.locator('#logoutBtn').click()
+        self.page.wait_for_function('!document.getElementById("logoutBtn").disabled')
+        self.assertTrue(self.page.locator('#app').is_visible())
+        self.assertEqual(self.page.locator('#logoutBtn').inner_text(), label)
+        self.assertEqual(self.page.url, 'https://mexay.test/#appointments')
 
     def test_detail_actions_persist_on_reload_desktop_and_mobile(self):
         for viewport in [{'width':1280,'height':900},{'width':390,'height':844}]:
