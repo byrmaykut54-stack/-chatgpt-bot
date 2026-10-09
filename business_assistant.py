@@ -862,7 +862,8 @@ class Handler(BaseHTTPRequestHandler):
             return
         if parsed.path == "/billing/iyzico/callback":
             token=(parse_qs(parsed.query).get("token") or parse_qs(parsed.query).get("checkoutFormToken") or [""])[0]
-            safe=json.dumps(token)
+            # Query parameters must never be able to terminate the script element.
+            safe=json.dumps(token).replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
             body='<!doctype html><html lang="tr"><head><meta charset="utf-8"><title>NEXORA Ödeme</title></head><body style="font-family:Arial;padding:40px;text-align:center"><h2>NEXORA</h2><p>Ödeme sonucu kontrol ediliyor...</p><script>fetch("/api/billing/complete",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({token:'+safe+'})}).then(()=>location.href="/").catch(()=>location.href="/");</script></body></html>'
             self.send_response(200); self.send_header("Content-Type","text/html; charset=utf-8"); self.send_header("Content-Length",str(len(body.encode("utf-8")))); self.end_headers(); self.wfile.write(body.encode("utf-8")); return
 
@@ -898,7 +899,8 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json(200, {"email_configured": email_ready,
                 "ai_configured": bool(os.environ.get("GEMINI_API_KEY")),
                 "calendar_configured": bool(google_calendar and google_calendar.configured()),
-                "payments_configured": bool(os.environ.get("IYZICO_API_KEY") and os.environ.get("IYZICO_SECRET_KEY"))})
+                "payments_configured": all(os.environ.get(key, "").strip() for key in
+                    ("IYZICO_API_KEY", "IYZICO_SECRET_KEY", "IYZICO_PRICING_PLAN_REFERENCE_CODE", "IYZICO_SUBSCRIPTION_CALLBACK_URL"))})
             return
         if parsed.path == "/api/auth/status":
             user=current_user(self)

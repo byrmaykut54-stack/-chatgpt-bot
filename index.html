@@ -1437,7 +1437,14 @@ async function loadTeam(){
  document.getElementById("teamList").innerHTML=users.map(u=>'<div style="padding:12px 0;border-bottom:1px solid #edf0f2"><div style="display:flex;justify-content:space-between;gap:10px;align-items:center"><div><b>'+escapeHtml(u.email)+'</b><div class="muted" style="font-size:12px;margin-top:3px">Hesap aktif • '+escapeHtml(u.role)+'</div></div><div style="display:flex;gap:8px;align-items:center"><span class="pill">'+escapeHtml(u.role)+'</span>'+(u.role==="staff"?'<button class="install" onclick="editTeamPermissions('+u.id+',\''+escapeHtml(u.email)+'\')">Yetkiler</button>':"")+'</div></div></div>').join("");
 }
 loadTeam();
-document.getElementById("logoutBtn").addEventListener("click",async()=>{await fetch("/api/auth/logout",{method:"POST"});location.reload();});
+document.getElementById("logoutBtn").addEventListener("click",async()=>{
+ const button=document.getElementById("logoutBtn");if(button.disabled)return;
+ const label=button.textContent;button.disabled=true;button.textContent="Çıkış yapılıyor…";
+ try{const r=await fetch("/api/auth/logout",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"});
+ const result=await r.json().catch(()=>({}));if(!r.ok)throw Error(result.error||"Çıkış yapılamadı. Yeniden deneyin.");location.reload();
+ }catch(error){alert(error.message||"Çıkış yapılamadı. Bağlantınızı kontrol edin.");}
+ finally{button.disabled=false;button.textContent=label;}
+});
 document.getElementById("teamForm").addEventListener("submit",async e=>{
  e.preventDefault();
  const r=await fetch("/api/users/create",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:document.getElementById("teamEmail").value,password:document.getElementById("teamPassword").value,role:"staff"})});
