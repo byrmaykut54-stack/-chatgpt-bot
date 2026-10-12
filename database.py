@@ -231,7 +231,7 @@ def encrypt_secret(value):
         return ""
     f = _fernet()
     if not f:
-        return value
+        raise RuntimeError("NEXORA_ENCRYPTION_KEY must be configured before storing integration credentials.")
     return f.encrypt(value.encode("utf-8")).decode("utf-8")
 
 def decrypt_secret(value):
@@ -239,8 +239,10 @@ def decrypt_secret(value):
     if not value:
         return ""
     f = _fernet()
-    if not f or not value.startswith("gAAAA"):
+    if not value.startswith("gAAAA"):
         return value
+    if not f:
+        raise RuntimeError("NEXORA_ENCRYPTION_KEY is required to decrypt integration credentials.")
     try:
         return f.decrypt(value.encode("utf-8")).decode("utf-8")
     except InvalidToken:

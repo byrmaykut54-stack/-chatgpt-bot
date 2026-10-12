@@ -1,0 +1,14 @@
+.git
+.github
+.env
+.env.*
+__pycache__
+*.pyc
+.venv
+venv
+agent
+test*.py
+customer_data
+appointments*.json
+messages.json
+*.zip
