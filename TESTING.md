@@ -9,7 +9,7 @@ python -m playwright install --with-deps chromium --only-shell
 TEST_DATABASE_URL=postgresql://postgres:test-only@localhost:5432/mexay_test RUN_BROWSER_TESTS=1 python -m unittest discover -v
 ```
 
-NEXORA CI supplies PostgreSQL and enables browser tests. Both environment variables
+MexAy CI supplies PostgreSQL and enables browser tests. Both environment variables
 must be set for release validation; a successful run with skipped tests is insufficient.
 
 Coverage:

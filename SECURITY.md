@@ -1,4 +1,4 @@
-# NEXORA production security checklist
+# MexAy production security checklist
 
 ## Already enforced
 - HTTP-only, Secure, SameSite session cookie
