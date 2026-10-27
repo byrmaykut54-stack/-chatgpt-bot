@@ -6,3 +6,8 @@ venv/
 *.db
 customer_data/
 appointments.local.json
+
+# Veritabanı yedekleri (müşteri verisi içerir, asla commit etmeyin)
+yedekler/
+*.dump
+*.dump.sha256

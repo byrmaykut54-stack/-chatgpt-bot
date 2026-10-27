@@ -102,7 +102,7 @@ def send_email(to_address, subject, body):
             req=urllib.request.Request(
                 "https://api.resend.com/emails",
                 data=payload,
-                headers={"Authorization":"Bearer "+resend_key,"Content-Type":"application/json","User-Agent":"NEXORA/1.0"},
+                headers={"Authorization":"Bearer "+resend_key,"Content-Type":"application/json","User-Agent":"MexAy/1.0"},
                 method="POST"
             )
             with urllib.request.urlopen(req,timeout=20) as response:
@@ -354,7 +354,7 @@ def iyzico_start_checkout(user):
     config=business_config_for_user(user)
     email=user[2]
     local=email.split("@",1)[0]
-    name=config.get("business_name","NEXORA")
+    name=config.get("business_name","MexAy")
     callback=os.environ.get("IYZICO_SUBSCRIPTION_CALLBACK_URL","").strip()
     if not callback:
         raise RuntimeError("IYZICO_SUBSCRIPTION_CALLBACK_URL yapılandırılmalı.")
@@ -864,7 +864,7 @@ class Handler(BaseHTTPRequestHandler):
             token=(parse_qs(parsed.query).get("token") or parse_qs(parsed.query).get("checkoutFormToken") or [""])[0]
             # Query parameters must never be able to terminate the script element.
             safe=json.dumps(token).replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
-            body='<!doctype html><html lang="tr"><head><meta charset="utf-8"><title>NEXORA Ödeme</title></head><body style="font-family:Arial;padding:40px;text-align:center"><h2>NEXORA</h2><p>Ödeme sonucu kontrol ediliyor...</p><script>fetch("/api/billing/complete",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({token:'+safe+'})}).then(()=>location.href="/").catch(()=>location.href="/");</script></body></html>'
+            body='<!doctype html><html lang="tr"><head><meta charset="utf-8"><title>MexAy Ödeme</title></head><body style="font-family:Arial;padding:40px;text-align:center"><h2>MexAy</h2><p>Ödeme sonucu kontrol ediliyor...</p><script>fetch("/api/billing/complete",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({token:'+safe+'})}).then(()=>location.href="/").catch(()=>location.href="/");</script></body></html>'
             self.send_response(200); self.send_header("Content-Type","text/html; charset=utf-8"); self.send_header("Content-Length",str(len(body.encode("utf-8")))); self.end_headers(); self.wfile.write(body.encode("utf-8")); return
 
         if parsed.path == "/api/master/status":
@@ -1393,7 +1393,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_response(200)
                 self.send_header("Set-Cookie","session=; HttpOnly; SameSite=Lax; Path=/; Secure; Max-Age=0")
                 self.send_header("Content-Type","application/json; charset=utf-8")
-                body=json.dumps({"success":True,"message":"NEXORA hesabınız ve işletme verileriniz kalıcı olarak silindi."},ensure_ascii=False).encode("utf-8")
+                body=json.dumps({"success":True,"message":"MexAy hesabınız ve işletme verileriniz kalıcı olarak silindi."},ensure_ascii=False).encode("utf-8")
                 self.send_header("Content-Length",str(len(body))); self.end_headers(); self.wfile.write(body); return
 
             if self.path == "/api/auth/logout":

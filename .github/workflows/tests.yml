@@ -1,4 +1,4 @@
-name: NEXORA Tests
+name: MexAy Tests
 
 on:
   workflow_dispatch:

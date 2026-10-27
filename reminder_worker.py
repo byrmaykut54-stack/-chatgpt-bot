@@ -91,7 +91,7 @@ def main():
             continue
 
         message = (
-            f"NEXORA hatırlatma: {business_name} işletmenizde {customer_name} adlı müşterinin "
+            f"MexAy hatırlatma: {business_name} işletmenizde {customer_name} adlı müşterinin "
             f"{date_text} {time_text} tarihli randevusu var. Hizmet: {service}."
         )
         whatsapp = database.get_business_whatsapp(business_id)
@@ -114,7 +114,7 @@ def main():
             try:
                 delivered = send_email(
                     email,
-                    f"NEXORA randevu hatırlatması — {date_text} {time_text}",
+                    f"MexAy randevu hatırlatması — {date_text} {time_text}",
                     message + (f"\nNot: {note}" if note else "")
                 )
                 if delivered:
@@ -125,7 +125,7 @@ def main():
         if delivered:
             sent += 1
 
-    print(f"NEXORA reminders: sent={sent} skipped={skipped}")
+    print(f"MexAy reminders: sent={sent} skipped={skipped}")
 
 if __name__ == "__main__":
     main()
