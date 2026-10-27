@@ -1,5 +1,7 @@
 # MexAy veritabanı yedekleme ve geri yükleme rehberi
 
+> Render kaydı (27 Ekim 2026 itibarıyla): `ai-isletme-asistani-db`, ücretsiz plan, PostgreSQL 18, Frankfurt, **süresi 28 Ekim 2026 13:14 UTC'de doluyor**.
+
 Amaç: Render'daki PostgreSQL veritabanını (`ai-isletme-asistani-db`) kaybetmeden yedeklemek ve yedeğin gerçekten geri yüklenebildiğini kanıtlamak.
 
 > **Önemli:** Yedek dosyası müşteri verisi içerir. GitHub'a yüklemeyin, herkese açık bir yerde paylaşmayın. Bağlantı adresini (`postgresql://kullanıcı:parola@...`) bir parola gibi saklayın; sohbete, e-postaya veya depoya yazmayın.
@@ -8,8 +10,9 @@ Amaç: Render'daki PostgreSQL veritabanını (`ai-isletme-asistani-db`) kaybetme
 
 1. Render panelinde veritabanını açın. Planını, durumunu, **PostgreSQL sürümünü** ve olası askıya alma/silinme tarihini not edin.
 2. **Connections** bölümünde **External Database URL** değerini bulun. (Bilgisayarınızdan bağlanmak için dış adres gerekir; *Internal* adres çalışmaz.)
-3. Bilgisayarınızda PostgreSQL **istemci** araçları (`pg_dump`, `pg_restore`, `psql`) kurulu olmalı. İstemci sürümü, sunucu sürümünden **eski olmamalı** (ör. sunucu 17 ise istemci 17 veya üstü).
-4. Kendi bilgisayarınız yoksa/uygun değilse aşağıdaki **Colab** yolunu kullanın.
+3. **IP izin listesi (Networking):** Bu veritabanında izin listesi **boş** olabilir; bu durumda dışarıdan gelen **tüm** bağlantılar engellenir ve `pg_dump` bağlanamaz. Render'da veritabanı sayfası → **Networking → Inbound IP Rules** bölümüne yedeği alacağınız bilgisayarın genel IP adresini `/32` ile ekleyin (ör. `203.0.113.7/32`). Colab'ın IP adresi her oturumda değişir; Colab kullanacaksanız yedek süresince geçici olarak `0.0.0.0/0` eklemek gerekebilir. Bu, adresi **herkese** açar (parola ve TLS hâlâ korur), bu yüzden **yedek biter bitmez kuralı silin.**
+4. Bilgisayarınızda PostgreSQL **istemci** araçları (`pg_dump`, `pg_restore`, `psql`) kurulu olmalı. İstemci sürümü, sunucu sürümünden **eski olmamalı** (bu veritabanı **PostgreSQL 18** olduğundan istemci 18 veya üstü olmalı).
+5. Kendi bilgisayarınız yoksa/uygun değilse aşağıdaki **Colab** yolunu kullanın.
 
 ## 2. Yedek alma (bilgisayar veya sunucu)
 
@@ -41,11 +44,11 @@ Betik; hedef boş değilse, hedef üretimle aynıysa veya SHA-256 tutmuyorsa **d
 
 Yeni bir Colab not defterinde hücreleri sırayla çalıştırın. Bağlantı adresi **ekranda görünmeden** `getpass` ile istenir; not defterini kaydederken çıktıya yazılmaz.
 
-Hücre 1 — istemciyi kur (sürümü Render panelindeki sunucu sürümüyle eşleştirin, örnekte 17):
+Hücre 1 — istemciyi kur (sunucu sürümü 18 olduğu için istemci 18 kurulur):
 ```python
 !apt-get -qq update && apt-get -qq install -y postgresql-common
 !/usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
-!apt-get -qq install -y postgresql-client-17
+!apt-get -qq install -y postgresql-client-18
 !pg_dump --version
 ```
 
